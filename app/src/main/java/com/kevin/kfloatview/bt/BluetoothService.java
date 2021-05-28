@@ -135,6 +135,7 @@ public class BluetoothService extends Service {
         }
 
         public void releaseCurActivity() {
+            Log.e(TAG, "releaseCurActivity: mActivity:"+mActivity);
             if (mActivity != null)
                 mActivity = null;
         }
@@ -541,7 +542,7 @@ public class BluetoothService extends Service {
         }
 
         private void actionRequestEnable(Intent intent) {
-
+            Log.e(TAG, "actionRequestEnable: 请求打开蓝牙");
         }
 
         private void actionRequestDiscoverable(Intent intent) {

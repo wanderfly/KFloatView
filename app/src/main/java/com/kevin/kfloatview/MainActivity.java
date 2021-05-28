@@ -1,6 +1,5 @@
 package com.kevin.kfloatview;
 
-import androidx.appcompat.app.AppCompatActivity;
 
 import android.content.ComponentName;
 import android.content.Intent;
@@ -42,6 +41,12 @@ public class MainActivity extends BtActivity {
     }
 
 
+    @Override
+    protected void onDestroy() {
+        super.onDestroy();
+        mBtBinder.releaseCurActivity();
+    }
+
     private BtServiceConnected mBtServiceConnected;
     private BtPrintCallback mBtPrintCallback;
     private BluetoothService mBtService;
@@ -53,6 +58,8 @@ public class MainActivity extends BtActivity {
         if (mBtServiceConnected == null)
             mBtServiceConnected = new BtServiceConnected();
         bindService(intent, mBtServiceConnected, BIND_AUTO_CREATE);
+
+        startService(intent);
     }
 
     private void unBindBtService() {
@@ -60,6 +67,10 @@ public class MainActivity extends BtActivity {
             unbindService(mBtServiceConnected);
             mBtServiceConnected = null;
         }
+
+        //stopService()
+        Intent intent = new Intent(this, BluetoothService.class);
+        stopService(intent);
 
     }
 
@@ -85,7 +96,6 @@ public class MainActivity extends BtActivity {
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
-            mBtBinder.releaseCurActivity();
             Log.e(TAG, "onServiceDisconnected: ");
         }
     }

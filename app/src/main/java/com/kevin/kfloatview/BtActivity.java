@@ -20,7 +20,7 @@ public class BtActivity extends AppCompatActivity {
     private static final int REQUEST_ENABLE_BLUETOOTH = 10;
     private static final int REQUEST_LOCATION_PERMISSION = 11;
 
-    @Override
+    /*@Override
     protected void onActivityResult(int requestCode, int resultCode, @Nullable Intent data) {
         super.onActivityResult(requestCode, resultCode, data);
 
@@ -29,14 +29,14 @@ public class BtActivity extends AppCompatActivity {
             Log.d(TAG, "onActivityResult: data:" + (data == null ? "null" : data.toString()));
         }
         if (requestCode == REQUEST_ENABLE_BLUETOOTH) {
-          /*  mTvData.setText((resultCode == RESULT_OK ? "打开蓝牙成功" : "打开蓝牙失败"));
-            mTvData.setClickable(true);*/
+          *//*  mTvData.setText((resultCode == RESULT_OK ? "打开蓝牙成功" : "打开蓝牙失败"));
+            mTvData.setClickable(true);*//*
 
-            /*if (resultCode == RESULT_OK) {
+            *//*if (resultCode == RESULT_OK) {
                 scanBleDevice();
-            }*/
+            }*//*
         }
-    }
+    }*/
 
     @CallSuper
     @Override
