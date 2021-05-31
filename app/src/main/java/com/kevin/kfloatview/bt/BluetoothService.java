@@ -1,32 +1,36 @@
 package com.kevin.kfloatview.bt;
 
 
-import android.app.Activity;
 import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
-import android.content.BroadcastReceiver;
-import android.content.Context;
 import android.content.Intent;
-import android.content.IntentFilter;
-import android.os.Binder;
+import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
 import android.os.Message;
 import android.util.Log;
+import android.view.Gravity;
+import android.view.View;
+import android.widget.FrameLayout;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
-import com.kevin.kfloatview.BtActivity;
+import com.kevin.kfloatview.R;
+import com.kevin.kfloatview.bt.floatview.EnFloatingView;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.HashMap;
+import java.util.Iterator;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
@@ -59,39 +63,56 @@ public class BluetoothService extends Service {
     private BluetoothAdapter mAdapter;
     private BluetoothSocket mBluetoothSocket;
     private BluetoothDevice mCacheFound;     //缓存指定的蓝牙设备
-    private BluetoothStateReceiver mBluetoothStateReceiver;
+    private BluetoothStateReceiver mBtStateReceiver;
+
+    private BluetoothActivity mActivity;
+    private FrameLayout mContainer;
+    private final HashMap<String, View> mViewMaps = new HashMap<>();
 
     @Override
     public void onCreate() {
-        Log.d(TAG, "onCreate: ");
+        Log.e(TAG, "onCreate: ");
         super.onCreate();
         BluetoothManager bm = (BluetoothManager) getSystemService(Service.BLUETOOTH_SERVICE);
         mAdapter = bm.getAdapter();
         initBluetoothFilter();
-
-    }
-
-    @Override
-    public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.d(TAG, "onStartCommand: " + intent.getAction());
-        //Bundle bundle = intent.getBundleExtra(ACTIVITY_EXTRA_NAME);
-        new Handler().postDelayed(new Runnable() {
-            @Override
-            public void run() {
-                if (mActivity != null) {
-                    Log.e(TAG, "run: 请求蓝牙权限");
-                    mActivity.reqEnableBluetooth();
-                }
-            }
-        }, 10000);
-        return super.onStartCommand(intent, flags, startId);
     }
 
     @Nullable
     @Override
     public IBinder onBind(Intent intent) {
-        Log.d(TAG, "onBind: ");
+        Log.e(TAG, "onBind: intent:" + intent);
         return new BluetoothBinder(this);
+    }
+
+    @Override
+    public void onRebind(Intent intent) {
+        super.onRebind(intent);
+        Log.e(TAG, "onRebind: intent:" + intent);
+    }
+
+    @Override
+    public int onStartCommand(Intent intent, int flags, int startId) {
+        Log.e(TAG, "onStartCommand: " + intent.getAction());
+        //Bundle bundle = intent.getBundleExtra(ACTIVITY_EXTRA_NAME);
+        return super.onStartCommand(intent, flags, startId);
+    }
+
+    @Override
+    public boolean onUnbind(Intent intent) {
+        Log.e(TAG, "onUnbind: ");
+        if (mActivity != null && mContainer != null) {
+            Log.e(TAG, "onUnbind: 移除view");
+            for (Map.Entry<String, View> map : mViewMaps.entrySet()) {
+                Log.e(TAG, "onUnbind: key:"+map.getKey()+" value:"+map.getValue());
+                mContainer.removeView(map.getValue());
+                mViewMaps.remove(map.getKey());
+            }
+            mActivity = null;
+            mContainer = null;
+        }
+        //return super.onUnbind(intent);
+        return true;
     }
 
     @Override
@@ -111,41 +132,64 @@ public class BluetoothService extends Service {
         mPrintCallback = callback;
     }
 
-    private BtActivity mActivity;
 
     public void printData(String jsonSting) {
 
     }
 
-    public class BluetoothBinder extends Binder {
-        @NonNull
-        public BluetoothService btService;
+    public void setCurActivity(BluetoothActivity activity) {
+        mActivity = activity;
+    }
 
-        public BluetoothBinder(@NonNull BluetoothService service) {
-            btService = service;
-        }
+    /**
+     * 调用在setCurActivity之后才有效
+     *
+     * @see #setCurActivity(BluetoothActivity)
+     */
+    public void showBtStateView() {
+        if (mActivity != null) {
+            Log.e(TAG, "showBtStateView: ");
+            mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
 
-        @NonNull
-        public BluetoothService getBtService() {
-            return btService;
-        }
+            //添加测试TextView
+            /*TextView textView = new TextView(mActivity);
+            textView.setText("nice too meet you\n boy");
+            textView.setLayoutParams(getFloatingLayoutParams());
+            textView.setBackgroundColor(Color.CYAN);
+            mContainer.addView(textView);
+            mViewMaps.put("mTV", textView);*/
 
-        public void setCurActivity(BtActivity activity) {
-            mActivity = activity;
-        }
+            //
+            EnFloatingView floatingView= new EnFloatingView(mActivity, R.layout.layout_float_view);
+            floatingView.setLayoutParams(getFloatingLayoutParams());
+            mContainer.addView(floatingView);
+            mViewMaps.put("floatingView", floatingView);
 
-        public void releaseCurActivity() {
-            Log.e(TAG, "releaseCurActivity: mActivity:"+mActivity);
-            if (mActivity != null)
-                mActivity = null;
+
+
         }
+    }
+
+    private FrameLayout.LayoutParams getFloatingLayoutParams() {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.BOTTOM | Gravity.START;
+        params.setMargins(0, params.topMargin, params.rightMargin, 500);
+        return params;
+    }
+
+    public void releaseCurActivity() {
+        Log.e(TAG, "releaseCurActivity: mActivity:" + mActivity);
+        if (mActivity != null)
+            mActivity = null;
     }
 
 
     /**
      * 是否扫描标准蓝牙设备
      */
-    private boolean isScanStandardBluetooth(boolean isScan) {
+    private boolean scanBluetooth(boolean isScan) {
         return isScan ? mAdapter.startDiscovery() : mAdapter.cancelDiscovery();
     }
 
@@ -244,7 +288,6 @@ public class BluetoothService extends Service {
 
     private void printBluetoothInfo() {
         if (mBluetoothSocket != null) {
-            //runOnUiThread(() -> Toast.makeText(BluetoothService.this, "蓝牙连接状态:" + mBluetoothSocket.isConnected(), Toast.LENGTH_SHORT).show());
             if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.M) {
                 Log.e(TAG, "run: 蓝牙是否连接:" + mBluetoothSocket.isConnected() + " 连接类型:" + mBluetoothSocket.getConnectionType());
             } else {
@@ -388,25 +431,15 @@ public class BluetoothService extends Service {
 
 
     private void initBluetoothFilter() {
-        IntentFilter bluetoothStateFilter = new IntentFilter();
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_FINISHED);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_DISCOVERY_STARTED);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_REQUEST_ENABLE);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_SCAN_MODE_CHANGED);
-        bluetoothStateFilter.addAction(BluetoothAdapter.ACTION_STATE_CHANGED);
-        bluetoothStateFilter.addAction(BluetoothDevice.ACTION_FOUND);
-        bluetoothStateFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
-        if (mBluetoothStateReceiver == null)
-            mBluetoothStateReceiver = new BluetoothStateReceiver();
-        registerReceiver(mBluetoothStateReceiver, bluetoothStateFilter);
+
+        if (mBtStateReceiver == null)
+            mBtStateReceiver = new BluetoothStateReceiver();
+        registerReceiver(mBtStateReceiver, mBtStateReceiver.getBtStateFilter());
     }
 
     private void cancelBluetoothFilter() {
-        if (mBluetoothStateReceiver != null)
-            unregisterReceiver(mBluetoothStateReceiver);
+        if (mBtStateReceiver != null)
+            unregisterReceiver(mBtStateReceiver);
     }
 
 
@@ -437,131 +470,4 @@ public class BluetoothService extends Service {
             return false;
         }
     });
-
-    private class BluetoothStateReceiver extends BroadcastReceiver {
-        @Override
-        public void onReceive(Context context, Intent intent) {
-            String action = intent.getAction();
-            Log.e(TAG, "onReceive: 蓝牙监听广播: action:" + action);
-            Log.e(TAG, "onReceive: 蓝牙监听广播: intent:" + intent.toString());
-            if (action != null) {
-                switch (action) {
-                    case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED:
-                        actionConnectionStateChanged(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
-                        actionDiscoveryFinished(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
-                        actionDiscoveryStarted(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED:
-                        actionLocalNameChanged(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE:
-                        actionRequestDiscoverable(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_REQUEST_ENABLE:
-                        actionRequestEnable(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_SCAN_MODE_CHANGED:
-                        actionScanModeChanged(intent);
-                        break;
-                    case BluetoothAdapter.ACTION_STATE_CHANGED:
-                        actionStateChanged(intent);
-                        break;
-                    //Todo 蓝牙device发现的设备
-                    case BluetoothDevice.ACTION_FOUND:
-                        actionDevicesFind(intent);
-                        break;
-                    case BluetoothDevice.ACTION_BOND_STATE_CHANGED:
-                        actionBondStateChanged(intent);
-                        break;
-                }
-            }
-        }
-
-        private void actionBondStateChanged(Intent intent) {
-            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
-            int previousState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
-
-            Log.e(TAG, "actionBondStateChanged: bondState:" + bondState);
-            Log.e(TAG, "actionBondStateChanged: previousState:" + previousState);
-
-            if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-                Toast.makeText(BluetoothService.this, "配对成功:" + device.getName(), Toast.LENGTH_SHORT).show();
-            }
-        }
-
-        private void actionDevicesFind(Intent intent) {
-            BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-            if (device != null) {
-                String devName = device.getName();
-                String devMac = device.getAddress();
-                if (DEBUG) {
-                    Log.d(TAG, "actionDevicesFind: 设备名字:" + devName);
-                    Log.d(TAG, "actionDevicesFind: 物理地址:" + devMac);
-                }
-                if (devName != null) {
-                    mSBuilder.append("设备名字:")
-                            .append(devName)
-                            .append("\n")
-                            .append("设备地址:")
-                            .append(devMac)
-                            .append("\n\n");
-                    //mTvContent.setText(mSBuilder.toString());
-                }
-
-                //if ("FXNB-868681042704138".equals(devName)) {
-                //.if ("Printer_E4BA".equals(devName)) {
-                //if ("NP100S31B3".equals(devName)) {
-                //Log.e(TAG, "actionDevicesFind: devname:length="+devName.length()+" "+"NP100S31B3".length());
-                if ("NP100S31B3  ".equals(devName)) {
-                    //if ("DESKTOP-2D8RTSR".equals(devName)) {
-                    Log.e(TAG, "actionDevicesFind: ----发现指定设备-----");
-                    Log.e(TAG, "actionDevicesFind: 绑定状态:" + device.getBondState());
-                    isScanStandardBluetooth(false);
-
-                    mCacheFound = device;
-
-                    /*Message msg = Message.obtain();
-                    msg.what = MSG_CONNECT_BLUETOOTH_DEVICE;
-                    msg.obj = device;
-                    mHandler.sendMessageDelayed(msg, 2000);*/
-                }
-            }
-        }
-
-        private void actionStateChanged(Intent intent) {
-
-        }
-
-        private void actionScanModeChanged(Intent intent) {
-
-        }
-
-        private void actionRequestEnable(Intent intent) {
-            Log.e(TAG, "actionRequestEnable: 请求打开蓝牙");
-        }
-
-        private void actionRequestDiscoverable(Intent intent) {
-        }
-
-        private void actionLocalNameChanged(Intent intent) {
-
-        }
-
-        private void actionDiscoveryStarted(Intent intent) {
-
-        }
-
-        private void actionDiscoveryFinished(Intent intent) {
-            //mTvSearchState.setText("搜索结束");
-        }
-
-        private void actionConnectionStateChanged(Intent intent) {
-
-        }
-    }
 }

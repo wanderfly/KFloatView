@@ -10,9 +10,11 @@ import android.util.Log;
 import android.view.View;
 import android.widget.TextView;
 
+import com.kevin.kfloatview.bt.BluetoothBinder;
 import com.kevin.kfloatview.bt.BluetoothService;
+import com.kevin.kfloatview.bt.BluetoothActivity;
 
-public class MainActivity extends BtActivity {
+public class MainActivity extends BluetoothActivity {
     private static final String TAG = "MainActivity";
 
     private TextView mTvState;
@@ -36,6 +38,10 @@ public class MainActivity extends BtActivity {
     }
 
     public void onClickPrintBt(View view) {
+        Log.e(TAG, "onClickPrintBt: ");
+        if (mBtService!=null){
+            mBtService.showBtStateView();
+        }
         printData("akdcjladbjbalwkbvdajbdsjkabvjds");
         printData("cadsbbj");
     }
@@ -44,19 +50,20 @@ public class MainActivity extends BtActivity {
     @Override
     protected void onDestroy() {
         super.onDestroy();
-        mBtBinder.releaseCurActivity();
     }
 
     private BtServiceConnected mBtServiceConnected;
     private BtPrintCallback mBtPrintCallback;
     private BluetoothService mBtService;
-    private BluetoothService.BluetoothBinder mBtBinder;
+    private BluetoothBinder mBtBinder;
 
 
     private void bindBtService() {
         Intent intent = new Intent(this, BluetoothService.class);
-        if (mBtServiceConnected == null)
+        if (mBtServiceConnected == null){
             mBtServiceConnected = new BtServiceConnected();
+            Log.e(TAG, "bindBtService: mBtServiceConnected 为null 创建新的连接者"+mBtServiceConnected);
+        }
         bindService(intent, mBtServiceConnected, BIND_AUTO_CREATE);
 
         startService(intent);
@@ -64,13 +71,14 @@ public class MainActivity extends BtActivity {
 
     private void unBindBtService() {
         if (mBtServiceConnected != null) {
+            Log.e(TAG, "unBindBtService: mBtServiceConnected 不为null 解除绑定" );
             unbindService(mBtServiceConnected);
             mBtServiceConnected = null;
         }
 
         //stopService()
-        Intent intent = new Intent(this, BluetoothService.class);
-        stopService(intent);
+        //Intent intent = new Intent(this, BluetoothService.class);
+        //stopService(intent);
 
     }
 
@@ -85,13 +93,15 @@ public class MainActivity extends BtActivity {
 
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
-            Log.e(TAG, "onServiceConnected: ");
-            mBtBinder = (BluetoothService.BluetoothBinder) service;
-            mBtBinder.setCurActivity(MainActivity.this);
+
+            mBtBinder = (BluetoothBinder) service;
+            Log.e(TAG, "onServiceConnected: mBtBinder:"+mBtBinder);
             mBtService = mBtBinder.getBtService();
+            mBtService.setCurActivity(MainActivity.this);
             if (mBtPrintCallback == null)
                 mBtPrintCallback = new BtPrintCallback();
             mBtService.setPrintCallback(mBtPrintCallback);
+            mBtService.showBtStateView();
         }
 
         @Override
