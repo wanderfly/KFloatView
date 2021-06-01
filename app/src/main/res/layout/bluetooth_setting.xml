@@ -89,7 +89,7 @@
         android:layout_marginTop="20dp"
         android:background="@drawable/bt_setting_bond_and_scan_device_bg" />
 
-    <ScrollView
+    <androidx.core.widget.NestedScrollView
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
         android:layout_below="@id/tv_bt_setting_scan_state"
@@ -113,7 +113,7 @@
                 android:id="@+id/rc_bt_setting_bonded_devices"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp" />
+                android:layout_marginTop="15dp" />
 
             <View
                 android:id="@+id/view_bt_setting_division_line"
@@ -135,10 +135,10 @@
                 android:id="@+id/rc_bt_setting_scan_devices"
                 android:layout_width="match_parent"
                 android:layout_height="wrap_content"
-                android:layout_marginTop="20dp" />
+                android:layout_marginTop="15dp" />
 
         </LinearLayout>
 
-    </ScrollView>
+    </androidx.core.widget.NestedScrollView>
 
 </RelativeLayout>
