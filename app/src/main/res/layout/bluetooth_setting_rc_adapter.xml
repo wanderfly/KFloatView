@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="56dp"
+    android:gravity="center_vertical"
+    android:paddingStart="14dp"
+    android:paddingEnd="14dp"
+    android:background="@drawable/bt_setting_rc_item_bg_ripple"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/iv_bt_setting_rc_device_ic"
+        android:layout_width="22dp"
+        android:layout_height="22dp"
+        android:src="@drawable/bt_setting_printer_normal" />
+
+    <TextView
+        android:id="@+id/tv_bt_setting_rc_device_name"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginStart="3dp"
+        android:layout_toEndOf="@id/iv_bt_setting_rc_device_ic"
+        android:layout_toStartOf="@id/iv_bt_setting_rc_linked"
+        android:layout_marginEnd="20dp"
+        android:maxLines="1"
+        android:ellipsize="end"
+        android:text="打印机设备1打印机设备1号打印机设备1号打印机设备1号打印机设备1号打印机设备1" />
+
+    <TextView
+        android:id="@+id/tv_bt_setting_rc_link_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentEnd="true"
+        android:text="连接" />
+
+    <ImageView
+        android:id="@+id/iv_bt_setting_rc_linked"
+        android:layout_width="18dp"
+        android:layout_height="18dp"
+        android:layout_marginEnd="4dp"
+        android:layout_toStartOf="@id/tv_bt_setting_rc_link_state"
+        android:src="@drawable/bt_setting_rc_linked" />
+
+
+</RelativeLayout>

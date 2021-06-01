@@ -1,0 +1,15 @@
+<animation-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item
+        android:drawable="@drawable/bt_setting_iv_list_left_0"
+        android:duration="400" />
+    <item
+        android:drawable="@drawable/bt_setting_iv_list_left_1"
+        android:duration="400" />
+    <item
+        android:drawable="@drawable/bt_setting_iv_list_left_2"
+        android:duration="400" />
+    <item
+        android:drawable="@drawable/bt_setting_iv_list_left_3"
+        android:duration="400" />
+
+</animation-list>

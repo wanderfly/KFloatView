@@ -37,6 +37,13 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:text="状态信息" />
+    <Button
+        android:id="@+id/tv_second_activity"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="20dp"
+        android:onClick="onClickSecond"
+        android:text="second" />
 
 
 </LinearLayout>

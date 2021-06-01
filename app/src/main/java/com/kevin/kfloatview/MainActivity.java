@@ -12,9 +12,9 @@ import android.widget.TextView;
 
 import com.kevin.kfloatview.bt.BluetoothBinder;
 import com.kevin.kfloatview.bt.BluetoothService;
-import com.kevin.kfloatview.bt.BluetoothActivity;
+import com.kevin.kfloatview.bt.BluetoothPmActivity;
 
-public class MainActivity extends BluetoothActivity {
+public class MainActivity extends BluetoothPmActivity {
     private static final String TAG = "MainActivity";
 
     private TextView mTvState;
@@ -39,11 +39,16 @@ public class MainActivity extends BluetoothActivity {
 
     public void onClickPrintBt(View view) {
         Log.e(TAG, "onClickPrintBt: ");
-        if (mBtService!=null){
+       /* if (mBtService!=null){
             mBtService.showBtStateView();
-        }
+        }*/
         printData("akdcjladbjbalwkbvdajbdsjkabvjds");
         printData("cadsbbj");
+    }
+
+    public void onClickSecond(View view) {
+        Intent intent = new Intent(this, SecondActivity.class);
+        startActivity(intent);
     }
 
 
@@ -60,9 +65,9 @@ public class MainActivity extends BluetoothActivity {
 
     private void bindBtService() {
         Intent intent = new Intent(this, BluetoothService.class);
-        if (mBtServiceConnected == null){
+        if (mBtServiceConnected == null) {
             mBtServiceConnected = new BtServiceConnected();
-            Log.e(TAG, "bindBtService: mBtServiceConnected 为null 创建新的连接者"+mBtServiceConnected);
+            Log.e(TAG, "bindBtService: mBtServiceConnected 为null 创建新的连接者" + mBtServiceConnected);
         }
         bindService(intent, mBtServiceConnected, BIND_AUTO_CREATE);
 
@@ -71,7 +76,7 @@ public class MainActivity extends BluetoothActivity {
 
     private void unBindBtService() {
         if (mBtServiceConnected != null) {
-            Log.e(TAG, "unBindBtService: mBtServiceConnected 不为null 解除绑定" );
+            Log.e(TAG, "unBindBtService: mBtServiceConnected 不为null 解除绑定");
             unbindService(mBtServiceConnected);
             mBtServiceConnected = null;
         }
@@ -95,7 +100,7 @@ public class MainActivity extends BluetoothActivity {
         public void onServiceConnected(ComponentName name, IBinder service) {
 
             mBtBinder = (BluetoothBinder) service;
-            Log.e(TAG, "onServiceConnected: mBtBinder:"+mBtBinder);
+            Log.e(TAG, "onServiceConnected: mBtBinder:" + mBtBinder);
             mBtService = mBtBinder.getBtService();
             mBtService.setCurActivity(MainActivity.this);
             if (mBtPrintCallback == null)

@@ -1,0 +1,48 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="320dp"
+    android:layout_height="56dp"
+    android:background="@drawable/bt_min_bg"
+    tools:context=".MainActivity">
+
+    <ImageView
+        android:id="@+id/iv_bt_min_printer"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_alignParentStart="true"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="12dp"
+        android:src="@drawable/bt_min_printer" />
+
+    <TextView
+        android:id="@+id/tv_bt_min_link_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_centerVertical="true"
+        android:layout_marginStart="5dp"
+        android:layout_toEndOf="@id/iv_bt_min_printer"
+        android:text="打印机未连接"
+        android:textColor="@color/white" />
+
+    <Button
+        android:id="@+id/btn_bt_min_link"
+        android:layout_width="76dp"
+        android:layout_height="28dp"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="20dp"
+        android:layout_toStartOf="@id/iv_bt_min_close"
+        android:background="@drawable/bt_min_btn_link_ripple"
+        android:text="切换设备" />
+
+    <ImageView
+        android:id="@+id/iv_bt_min_close"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
+        android:layout_alignParentEnd="true"
+        android:layout_centerVertical="true"
+        android:layout_marginEnd="13dp"
+        android:src="@drawable/bt_min_close" />
+
+
+</RelativeLayout>

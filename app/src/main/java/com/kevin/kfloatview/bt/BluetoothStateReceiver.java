@@ -30,8 +30,8 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
         mBtStateFilter.addAction(BluetoothDevice.ACTION_FOUND);
         mBtStateFilter.addAction(BluetoothDevice.ACTION_BOND_STATE_CHANGED);
         //蓝牙权限请求activity
-        mBtStateFilter.addAction(BluetoothActivity.BT_ACTION_LOCATION_PERMISSION_GRANT_STATE);
-        mBtStateFilter.addAction(BluetoothActivity.BT_ACTION_ENABLE_BLUETOOTH_STATE);
+        mBtStateFilter.addAction(BluetoothPmActivity.BT_ACTION_LOCATION_PERMISSION_GRANT_STATE);
+        mBtStateFilter.addAction(BluetoothPmActivity.BT_ACTION_ENABLE_BLUETOOTH_STATE);
     }
 
     public IntentFilter getBtStateFilter() {
@@ -78,10 +78,10 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
                     aBondStateChanged(intent);
                     break;
                 //Todo 蓝牙权限请求activity
-                case BluetoothActivity.BT_ACTION_LOCATION_PERMISSION_GRANT_STATE:
+                case BluetoothPmActivity.BT_ACTION_LOCATION_PERMISSION_GRANT_STATE:
                     aLocationGrantState(intent);
                     break;
-                case BluetoothActivity.BT_ACTION_ENABLE_BLUETOOTH_STATE:
+                case BluetoothPmActivity.BT_ACTION_ENABLE_BLUETOOTH_STATE:
                     aBtEnableState(intent);
                     break;
             }
@@ -89,11 +89,11 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
     }
 
     private void aBtEnableState(Intent intent) {
-        Log.e(TAG, "aBtEnableState: " + intent.getBooleanExtra(BluetoothActivity.EXTRA_NAME, false));
+        Log.e(TAG, "aBtEnableState: " + intent.getBooleanExtra(BluetoothPmActivity.EXTRA_NAME, false));
     }
 
     private void aLocationGrantState(Intent intent) {
-        Log.e(TAG, "aLocationGrantState: " + intent.getBooleanExtra(BluetoothActivity.EXTRA_NAME, false));
+        Log.e(TAG, "aLocationGrantState: " + intent.getBooleanExtra(BluetoothPmActivity.EXTRA_NAME, false));
 
     }
 

@@ -1,0 +1,144 @@
+<?xml version="1.0" encoding="utf-8"?>
+<RelativeLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    tools:context=".bt.BluetoothSetActivity">
+
+    <View
+        android:id="@+id/view_top"
+        android:layout_width="match_parent"
+        android:layout_height="287dp"
+        android:background="@drawable/bt_setting_top_bg" />
+
+    <ImageView
+        android:id="@+id/iv_bt_setting_close"
+        android:layout_width="20dp"
+        android:layout_height="20dp"
+        android:layout_marginStart="20dp"
+        android:layout_marginTop="15dp"
+        android:layout_marginBottom="15dp"
+        android:src="@drawable/bt_setting_iv_close" />
+
+    <TextView
+        android:id="@+id/tv_bt_setting_title"
+        android:layout_width="wrap_content"
+        android:layout_height="50dp"
+        android:layout_centerHorizontal="true"
+        android:gravity="center"
+        android:text="打印设备"
+        android:textColor="@android:color/white"
+        android:textSize="18sp" />
+
+    <ImageView
+        android:id="@+id/iv_bt_setting_circle"
+        android:layout_width="128dp"
+        android:layout_height="128dp"
+        android:layout_below="@id/tv_bt_setting_title"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="37dp"
+        android:src="@drawable/bt_setting_circle" />
+
+
+    <!--圆中心的打印机图标-->
+    <ImageView
+        android:id="@+id/iv_bt_setting_circle_printer"
+        android:layout_width="128dp"
+        android:layout_height="128dp"
+        android:layout_below="@id/tv_bt_setting_title"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="37dp"
+        android:padding="50dp"
+        android:src="@drawable/bt_setting_circle_printer" />
+
+    <!--圆左边 动画效果-->
+    <ImageView
+        android:id="@+id/iv_bt_setting_left_anim"
+        android:layout_width="55dp"
+        android:layout_height="80dp"
+        android:layout_below="@id/tv_bt_setting_title"
+        android:layout_marginTop="61dp"
+        android:layout_marginEnd="12dp"
+        android:layout_toStartOf="@id/iv_bt_setting_circle"
+        android:src="@drawable/animation_list_bt_setting_left" />
+
+    <!--圆右边 动画效果-->
+    <ImageView
+        android:id="@+id/iv_bt_setting_right_anim"
+        android:layout_width="55dp"
+        android:layout_height="80dp"
+        android:layout_below="@id/tv_bt_setting_title"
+        android:layout_marginStart="12dp"
+        android:layout_marginTop="61dp"
+        android:layout_toEndOf="@id/iv_bt_setting_circle"
+        android:src="@drawable/animation_list_bt_setting_right" />
+
+    <TextView
+        android:id="@+id/tv_bt_setting_scan_state"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/iv_bt_setting_circle"
+        android:layout_centerHorizontal="true"
+        android:layout_marginTop="15dp"
+        android:text="搜索设备中..." />
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:layout_below="@id/tv_bt_setting_scan_state"
+        android:layout_marginTop="20dp"
+        android:background="@drawable/bt_setting_bond_and_scan_device_bg" />
+
+    <ScrollView
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_below="@id/tv_bt_setting_scan_state"
+        android:layout_marginTop="40dp">
+
+        <LinearLayout
+            android:layout_width="match_parent"
+            android:layout_height="wrap_content"
+            android:orientation="vertical">
+
+            <TextView
+                android:id="@+id/tv_bt_setting_bonded_devices_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="17dp"
+                android:text="已配对设备"
+                android:textColor="#ff999999"
+                android:textSize="13sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rc_bt_setting_bonded_devices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp" />
+
+            <View
+                android:id="@+id/view_bt_setting_division_line"
+                android:layout_width="wrap_content"
+                android:layout_height="15dp"
+                android:background="#F7F7F7" />
+
+            <TextView
+                android:id="@+id/tv_bt_setting_scan_devices_title"
+                android:layout_width="wrap_content"
+                android:layout_height="wrap_content"
+                android:layout_marginStart="17dp"
+                android:layout_marginTop="20dp"
+                android:text="其它设备"
+                android:textColor="#ff999999"
+                android:textSize="13sp" />
+
+            <androidx.recyclerview.widget.RecyclerView
+                android:id="@+id/rc_bt_setting_scan_devices"
+                android:layout_width="match_parent"
+                android:layout_height="wrap_content"
+                android:layout_marginTop="20dp" />
+
+        </LinearLayout>
+
+    </ScrollView>
+
+</RelativeLayout>

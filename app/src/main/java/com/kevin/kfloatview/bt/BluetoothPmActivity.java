@@ -13,10 +13,18 @@ import com.kevin.kfloatview.PermissionUtil;
 
 /**
  * @author Kevin  2021/5/28
- * 蓝牙权限请求activity
+ * 蓝牙权限请求activity  (BluetoothPermissionActivity)
+ * 所需权限如下:
+ * <p>
+ * <uses-permission android:name="android.permission.BLUETOOTH" />
+ * <uses-permission android:name="android.permission.BLUETOOTH_ADMIN" />
+ * //没有定位权限无法搜索周边设备
+ * <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
+ * <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
+ * <p/>
  */
-public abstract class BluetoothActivity extends AppCompatActivity {
-    private static final String TAG = "BtActivity";
+public abstract class BluetoothPmActivity extends AppCompatActivity {
+    private static final String TAG = BluetoothPmActivity.class.getSimpleName();
     private static final boolean DEBUG = true;
     private static final int REQUEST_ENABLE_BLUETOOTH = 1000;
     private static final int REQUEST_LOCATION_PERMISSION = 1001;

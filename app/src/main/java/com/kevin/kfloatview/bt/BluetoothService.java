@@ -7,7 +7,6 @@ import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
-import android.graphics.Color;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -15,8 +14,9 @@ import android.os.Message;
 import android.util.Log;
 import android.view.Gravity;
 import android.view.View;
+import android.widget.Button;
 import android.widget.FrameLayout;
-import android.widget.TextView;
+import android.widget.ImageView;
 import android.widget.Toast;
 
 import androidx.annotation.NonNull;
@@ -29,7 +29,6 @@ import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
@@ -44,6 +43,7 @@ public class BluetoothService extends Service {
 
 
     public static final String ACTIVITY_EXTRA_NAME = "activity_extra_name";
+    private static final String TAG_BT_MIN_LAYOUT = "tag_bt_min_layout";
     private static final String SPACE = "         ";
     private static final String STAR = "* * * * * * * * * * * * * * * * ";
     private static final byte[] code_1 = {27, 69, 0};//取消加粗模式
@@ -65,7 +65,7 @@ public class BluetoothService extends Service {
     private BluetoothDevice mCacheFound;     //缓存指定的蓝牙设备
     private BluetoothStateReceiver mBtStateReceiver;
 
-    private BluetoothActivity mActivity;
+    private BluetoothPmActivity mActivity;
     private FrameLayout mContainer;
     private final HashMap<String, View> mViewMaps = new HashMap<>();
 
@@ -104,7 +104,7 @@ public class BluetoothService extends Service {
         if (mActivity != null && mContainer != null) {
             Log.e(TAG, "onUnbind: 移除view");
             for (Map.Entry<String, View> map : mViewMaps.entrySet()) {
-                Log.e(TAG, "onUnbind: key:"+map.getKey()+" value:"+map.getValue());
+                Log.e(TAG, "onUnbind: key:" + map.getKey() + " value:" + map.getValue());
                 mContainer.removeView(map.getValue());
                 mViewMaps.remove(map.getKey());
             }
@@ -137,14 +137,14 @@ public class BluetoothService extends Service {
 
     }
 
-    public void setCurActivity(BluetoothActivity activity) {
+    public void setCurActivity(BluetoothPmActivity activity) {
         mActivity = activity;
     }
 
     /**
      * 调用在setCurActivity之后才有效
      *
-     * @see #setCurActivity(BluetoothActivity)
+     * @see #setCurActivity(BluetoothPmActivity)
      */
     public void showBtStateView() {
         if (mActivity != null) {
@@ -160,17 +160,52 @@ public class BluetoothService extends Service {
             mViewMaps.put("mTV", textView);*/
 
             //
-            EnFloatingView floatingView= new EnFloatingView(mActivity, R.layout.layout_float_view);
-            floatingView.setLayoutParams(getFloatingLayoutParams());
+            //EnFloatingView floatingView= new EnFloatingView(mActivity, R.layout.layout_float_view);
+            EnFloatingView floatingView = new EnFloatingView(mActivity, R.layout.bluetooth_min);
+            floatingView.setAdsorptionEdge(false);
+            floatingView.setLayoutParams(getBtMinLayoutParams());
+            Button btnLink = floatingView.findViewById(R.id.btn_bt_min_link);
+            btnLink.setOnClickListener(v -> {
+                if (mActivity != null) {
+                    Intent intent = new Intent(mActivity, BluetoothSetActivity.class);
+                    mActivity.startActivity(intent);
+                }
+            });
+            ImageView ivClose = floatingView.findViewById(R.id.iv_bt_min_close);
+            ivClose.setOnClickListener(v -> {
+                if (mActivity != null && mContainer != null) {
+                    View view = mViewMaps.get(TAG_BT_MIN_LAYOUT);
+                    if (view != null) {
+                        mViewMaps.remove(TAG_BT_MIN_LAYOUT);
+                        mContainer.removeView(view);
+                    }
+                }
+            });
+            Log.e(TAG, "showBtStateView: parent:"+floatingView.getParent());
             mContainer.addView(floatingView);
-            mViewMaps.put("floatingView", floatingView);
-
-
-
+            mViewMaps.put(TAG_BT_MIN_LAYOUT, floatingView);
         }
     }
 
     private FrameLayout.LayoutParams getFloatingLayoutParams() {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.BOTTOM | Gravity.START;
+        params.setMargins(0, params.topMargin, params.rightMargin, 500);
+        return params;
+    }
+
+    private FrameLayout.LayoutParams getBtMinLayoutParams() {
+        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
+                FrameLayout.LayoutParams.WRAP_CONTENT,
+                FrameLayout.LayoutParams.WRAP_CONTENT);
+        params.gravity = Gravity.BOTTOM | Gravity.CENTER_HORIZONTAL;
+        params.setMargins(0, params.topMargin, params.rightMargin, 100);
+        return params;
+    }
+
+    private FrameLayout.LayoutParams getBtCircleLayoutParams() {
         FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
                 FrameLayout.LayoutParams.WRAP_CONTENT,
                 FrameLayout.LayoutParams.WRAP_CONTENT);

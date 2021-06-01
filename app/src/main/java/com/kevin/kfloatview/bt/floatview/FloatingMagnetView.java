@@ -36,6 +36,7 @@ public class FloatingMagnetView extends FrameLayout {
     private int mScreenHeight;
     private int mStatusBarHeight;
     private boolean isNearestLeft = true;
+    private boolean mAdsorptionEdge = true;
     private float mPortraitY;
 
     public void setMagnetViewListener(MagnetViewListener magnetViewListener) {
@@ -76,7 +77,8 @@ public class FloatingMagnetView extends FrameLayout {
                 break;
             case MotionEvent.ACTION_UP:
                 clearPortraitY();
-                moveToEdge();
+                if (mAdsorptionEdge)
+                    moveToEdge();
                 if (isOnClickEvent()) {
                     dealClickEvent();
                 }
@@ -162,6 +164,14 @@ public class FloatingMagnetView extends FrameLayout {
         if (mMagnetViewListener != null) {
             mMagnetViewListener.onRemove(this);
         }
+    }
+
+
+    /**
+     * 设置拖动view后是否吸附到屏幕边缘
+     */
+    public void setAdsorptionEdge(boolean adsorptionEdge) {
+        mAdsorptionEdge = adsorptionEdge;
     }
 
     protected class MoveAnimator implements Runnable {
