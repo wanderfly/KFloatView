@@ -94,7 +94,7 @@ public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDevice
     public void onBindViewHolder(@NonNull BtSettingDeviceAdapter.DeviceHolder holder, int position) {
         BtSettingDeviceInfo bonedDev = mBondedDevs.get(position);
 
-        String devName = bonedDev.getName();
+        String devName = bonedDev.getBtDevice().getName();
         holder.tvDeviceName.setText(devName == null ? "未知设备" : devName);
         if (bonedDev.getLinkState()) {
             holder.ivIcon.setImageDrawable(mDrawPrinterChecked);

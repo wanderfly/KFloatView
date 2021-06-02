@@ -14,6 +14,7 @@ import com.kevin.kfloatview.bt.BluetoothBinder;
 import com.kevin.kfloatview.bt.BluetoothService;
 import com.kevin.kfloatview.bt.BluetoothPmActivity;
 
+
 public class MainActivity extends BluetoothPmActivity {
     private static final String TAG = "MainActivity";
 
@@ -39,9 +40,6 @@ public class MainActivity extends BluetoothPmActivity {
 
     public void onClickPrintBt(View view) {
         Log.e(TAG, "onClickPrintBt: ");
-       /* if (mBtService!=null){
-            mBtService.showBtStateView();
-        }*/
         printData("akdcjladbjbalwkbvdajbdsjkabvjds");
         printData("cadsbbj");
     }
@@ -58,9 +56,7 @@ public class MainActivity extends BluetoothPmActivity {
     }
 
     private BtServiceConnected mBtServiceConnected;
-    private BtPrintCallback mBtPrintCallback;
     private BluetoothService mBtService;
-    private BluetoothBinder mBtBinder;
 
 
     private void bindBtService() {
@@ -99,28 +95,16 @@ public class MainActivity extends BluetoothPmActivity {
         @Override
         public void onServiceConnected(ComponentName name, IBinder service) {
 
-            mBtBinder = (BluetoothBinder) service;
+            BluetoothBinder mBtBinder = (BluetoothBinder) service;
             Log.e(TAG, "onServiceConnected: mBtBinder:" + mBtBinder);
             mBtService = mBtBinder.getBtService();
             mBtService.setCurActivity(MainActivity.this);
-            if (mBtPrintCallback == null)
-                mBtPrintCallback = new BtPrintCallback();
-            mBtService.setPrintCallback(mBtPrintCallback);
             mBtService.showBtStateView();
         }
 
         @Override
         public void onServiceDisconnected(ComponentName name) {
             Log.e(TAG, "onServiceDisconnected: ");
-        }
-    }
-
-    private class BtPrintCallback implements BluetoothService.PrintCallback {
-
-        @Override
-        public void stateChange(String data) {
-            Log.e(TAG, "stateChange: " + data);
-            mTvState.setText(data);
         }
     }
 

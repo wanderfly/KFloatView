@@ -23,13 +23,16 @@ import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
 import com.kevin.kfloatview.R;
+import com.kevin.kfloatview.bt.adapter.BtSettingDeviceInfo;
 import com.kevin.kfloatview.bt.floatview.EnFloatingView;
 
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.UUID;
 import java.util.Vector;
@@ -101,16 +104,9 @@ public class BluetoothService extends Service {
     @Override
     public boolean onUnbind(Intent intent) {
         Log.e(TAG, "onUnbind: ");
-        if (mActivity != null && mContainer != null) {
-            Log.e(TAG, "onUnbind: 移除view");
-            for (Map.Entry<String, View> map : mViewMaps.entrySet()) {
-                Log.e(TAG, "onUnbind: key:" + map.getKey() + " value:" + map.getValue());
-                mContainer.removeView(map.getValue());
-                mViewMaps.remove(map.getKey());
-            }
-            mActivity = null;
-            mContainer = null;
-        }
+        removeActivityAllViews();
+        //mActivity = null;
+        //mContainer = null;
         //return super.onUnbind(intent);
         return true;
     }
@@ -122,14 +118,51 @@ public class BluetoothService extends Service {
         Log.d(TAG, "onDestroy: ");
     }
 
-    public interface PrintCallback {
-        void stateChange(String data);
+    /**
+     * 移除当前activity中通过服务添加的所以view
+     */
+    private void removeActivityAllViews() {
+        if (mActivity != null && mContainer != null) {
+            Log.e(TAG, "removeActivityAllViews: 移除view");
+            for (Map.Entry<String, View> map : mViewMaps.entrySet()) {
+                Log.e(TAG, "removeActivityAllViews: key:" + map.getKey() + " value:" + map.getValue());
+                mContainer.removeView(map.getValue());
+                mViewMaps.remove(map.getKey());
+            }
+        }
     }
 
-    private PrintCallback mPrintCallback;
 
-    public void setPrintCallback(PrintCallback callback) {
-        mPrintCallback = callback;
+    private IBluetoothStateCallBack mIBluetoothStateCallBack;
+
+    public void setBluetoothStateCallback(@Nullable IBluetoothStateCallBack callback) {
+        mIBluetoothStateCallBack = callback;
+        if (mBtStateReceiver != null)
+            mBtStateReceiver.setCallBack(callback);
+        if (mIBluetoothStateCallBack != null) {
+            Set<BluetoothDevice> devs = mAdapter.getBondedDevices();
+            if (devs != null) {
+                int devsSize = devs.size();
+                if (devsSize > 0) {
+                    ArrayList<BtSettingDeviceInfo> deviceInfos = new ArrayList<>();
+                    if (mBluetoothSocket != null && mBluetoothSocket.isConnected()) {
+                        BluetoothDevice connectedDev = mBluetoothSocket.getRemoteDevice();
+                        int i = 1;
+                        for (BluetoothDevice bondedDev : devs) {
+                            if (Objects.equals(connectedDev.getName(), bondedDev.getName())) //将连接的设备放在集合首位
+                                deviceInfos.add(0, new BtSettingDeviceInfo(bondedDev, true));
+                            else
+                                deviceInfos.add(i++, new BtSettingDeviceInfo(bondedDev, false));
+                        }
+                    } else {
+                        for (BluetoothDevice bondedDev : devs) {
+                            deviceInfos.add(new BtSettingDeviceInfo(bondedDev, false));
+                        }
+                    }
+                    mIBluetoothStateCallBack.updateBondedDevs(deviceInfos);
+                }
+            }
+        }
     }
 
 
@@ -139,6 +172,7 @@ public class BluetoothService extends Service {
 
     public void setCurActivity(BluetoothPmActivity activity) {
         mActivity = activity;
+        mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
     }
 
     /**
@@ -147,19 +181,13 @@ public class BluetoothService extends Service {
      * @see #setCurActivity(BluetoothPmActivity)
      */
     public void showBtStateView() {
+        removeActivityAllViews();
+
         if (mActivity != null) {
             Log.e(TAG, "showBtStateView: ");
-            mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
+            if (mContainer == null)
+                mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
 
-            //添加测试TextView
-            /*TextView textView = new TextView(mActivity);
-            textView.setText("nice too meet you\n boy");
-            textView.setLayoutParams(getFloatingLayoutParams());
-            textView.setBackgroundColor(Color.CYAN);
-            mContainer.addView(textView);
-            mViewMaps.put("mTV", textView);*/
-
-            //
             //EnFloatingView floatingView= new EnFloatingView(mActivity, R.layout.layout_float_view);
             EnFloatingView floatingView = new EnFloatingView(mActivity, R.layout.bluetooth_min);
             floatingView.setAdsorptionEdge(false);
@@ -173,27 +201,19 @@ public class BluetoothService extends Service {
             });
             ImageView ivClose = floatingView.findViewById(R.id.iv_bt_min_close);
             ivClose.setOnClickListener(v -> {
-                if (mActivity != null && mContainer != null) {
+                /*if (mActivity != null && mContainer != null) {
                     View view = mViewMaps.get(TAG_BT_MIN_LAYOUT);
                     if (view != null) {
                         mViewMaps.remove(TAG_BT_MIN_LAYOUT);
                         mContainer.removeView(view);
                     }
-                }
+                }*/
+                removeActivityAllViews();
             });
-            Log.e(TAG, "showBtStateView: parent:"+floatingView.getParent());
+            Log.e(TAG, "showBtStateView: parent:" + floatingView.getParent());
             mContainer.addView(floatingView);
             mViewMaps.put(TAG_BT_MIN_LAYOUT, floatingView);
         }
-    }
-
-    private FrameLayout.LayoutParams getFloatingLayoutParams() {
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        params.gravity = Gravity.BOTTOM | Gravity.START;
-        params.setMargins(0, params.topMargin, params.rightMargin, 500);
-        return params;
     }
 
     private FrameLayout.LayoutParams getBtMinLayoutParams() {
@@ -205,26 +225,28 @@ public class BluetoothService extends Service {
         return params;
     }
 
-    private FrameLayout.LayoutParams getBtCircleLayoutParams() {
-        FrameLayout.LayoutParams params = new FrameLayout.LayoutParams(
-                FrameLayout.LayoutParams.WRAP_CONTENT,
-                FrameLayout.LayoutParams.WRAP_CONTENT);
-        params.gravity = Gravity.BOTTOM | Gravity.START;
-        params.setMargins(0, params.topMargin, params.rightMargin, 500);
-        return params;
-    }
-
     public void releaseCurActivity() {
         Log.e(TAG, "releaseCurActivity: mActivity:" + mActivity);
-        if (mActivity != null)
+        if (mActivity != null) {
             mActivity = null;
+            mContainer = null;
+        }
+
     }
 
+
+    public boolean isBluetoothEnable() {
+        return mAdapter.isEnabled();
+    }
+
+    public boolean closeBluetooth() {
+        return mAdapter.disable();
+    }
 
     /**
      * 是否扫描标准蓝牙设备
      */
-    private boolean scanBluetooth(boolean isScan) {
+    public boolean scanBluetooth(boolean isScan) {
         return isScan ? mAdapter.startDiscovery() : mAdapter.cancelDiscovery();
     }
 
@@ -300,6 +322,7 @@ public class BluetoothService extends Service {
 
                             mBluetoothSocket = device.createRfcommSocketToServiceRecord(uuid);
                             mAdapter.cancelDiscovery();
+                            //mAdapter.enable();
                             mBluetoothSocket.connect();
                             printBluetoothInfo();
                         }
@@ -468,7 +491,7 @@ public class BluetoothService extends Service {
     private void initBluetoothFilter() {
 
         if (mBtStateReceiver == null)
-            mBtStateReceiver = new BluetoothStateReceiver();
+            mBtStateReceiver = new BluetoothStateReceiver(mAdapter);
         registerReceiver(mBtStateReceiver, mBtStateReceiver.getBtStateFilter());
     }
 

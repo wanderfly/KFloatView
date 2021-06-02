@@ -64,15 +64,15 @@ public abstract class BluetoothPmActivity extends AppCompatActivity {
         sendBroadcast(intent);
     }
 
-    public boolean hasLocationPermission() {
+    protected boolean hasLocationPermission() {
         return PermissionUtil.checkLocationCoarseAndFine(this);
     }
 
-    public void reqLocationPermission() {
+    protected void reqLocationPermission() {
         PermissionUtil.requestLocationCoarseAndFine(this, REQUEST_LOCATION_PERMISSION);
     }
 
-    public void reqEnableBluetooth() {
+    protected void reqEnableBluetooth() {
         Intent enableBtIntent = new Intent(BluetoothAdapter.ACTION_REQUEST_ENABLE);
         startActivityForResult(enableBtIntent, REQUEST_ENABLE_BLUETOOTH);
     }

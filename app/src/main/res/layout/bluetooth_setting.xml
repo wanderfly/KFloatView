@@ -43,12 +43,11 @@
     <!--圆中心的打印机图标-->
     <ImageView
         android:id="@+id/iv_bt_setting_circle_printer"
-        android:layout_width="128dp"
-        android:layout_height="128dp"
+        android:layout_width="28dp"
+        android:layout_height="28dp"
         android:layout_below="@id/tv_bt_setting_title"
         android:layout_centerHorizontal="true"
-        android:layout_marginTop="37dp"
-        android:padding="50dp"
+        android:layout_marginTop="87dp"
         android:src="@drawable/bt_setting_circle_printer" />
 
     <!--圆左边 动画效果-->
@@ -107,7 +106,7 @@
                 android:layout_marginStart="17dp"
                 android:text="已配对设备"
                 android:textColor="#ff999999"
-                android:textSize="13sp" />
+                android:textSize="16sp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rc_bt_setting_bonded_devices"
@@ -129,7 +128,7 @@
                 android:layout_marginTop="20dp"
                 android:text="其它设备"
                 android:textColor="#ff999999"
-                android:textSize="13sp" />
+                android:textSize="16sp" />
 
             <androidx.recyclerview.widget.RecyclerView
                 android:id="@+id/rc_bt_setting_scan_devices"
