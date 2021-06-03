@@ -3,6 +3,7 @@ package com.kevin.kfloatview.bt.adapter;
 import android.content.Context;
 import android.graphics.Color;
 import android.graphics.drawable.Drawable;
+import android.util.Log;
 import android.view.LayoutInflater;
 import android.view.View;
 import android.view.ViewGroup;
@@ -12,6 +13,7 @@ import android.widget.TextView;
 
 
 import androidx.annotation.NonNull;
+import androidx.annotation.Nullable;
 import androidx.core.content.res.ResourcesCompat;
 import androidx.recyclerview.widget.RecyclerView;
 
@@ -24,7 +26,7 @@ import java.util.ArrayList;
  */
 public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDeviceAdapter.DeviceHolder> {
 
-    public static class DeviceHolder extends RecyclerView.ViewHolder implements View.OnClickListener {
+    public static class DeviceHolder extends RecyclerView.ViewHolder implements View.OnClickListener, View.OnLongClickListener {
 
         private final ImageView ivIcon;
         private final ImageView ivLinked;
@@ -41,6 +43,7 @@ public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDevice
             tvLinkState = itemView.findViewById(R.id.tv_bt_setting_rc_link_state);
             listener = itemClickListener;
             itemView.setOnClickListener(this);
+            itemView.setOnLongClickListener(this);
         }
 
 
@@ -50,10 +53,20 @@ public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDevice
                 listener.onItemClick(v, getAdapterPosition());
             }
         }
+
+        @Override
+        public boolean onLongClick(View v) {
+            if (listener != null) {
+                listener.onItemLongClick(v, getAdapterPosition());
+            }
+            Log.e("Long", "onLongClick: ");
+            return false;
+        }
     }
 
 
-    private ArrayList<BtSettingDeviceInfo> mBondedDevs;
+    private @NonNull
+    ArrayList<BtSettingDeviceInfo> mBondedDevs;
     private final Drawable mDrawPrinterNormal;
     private final Drawable mDrawPrinterChecked;
 
@@ -69,6 +82,8 @@ public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDevice
     public interface OnItemClickListener {
 
         void onItemClick(View view, int position);
+
+        void onItemLongClick(View view, int position);
     }
 
     private OnItemClickListener onItemClickListener;
@@ -80,6 +95,13 @@ public class BtSettingDeviceAdapter extends RecyclerView.Adapter<BtSettingDevice
     public void updateBondedDevices(@NonNull ArrayList<BtSettingDeviceInfo> bondedDevices) {
         this.mBondedDevs = bondedDevices;
         notifyDataSetChanged();
+    }
+
+    @Nullable
+    public BtSettingDeviceInfo getItemDevice(int index) {
+        if (index < 0 || index > (mBondedDevs.size() - 1))
+            return null;
+        return mBondedDevs.get(index);
     }
 
     @NonNull

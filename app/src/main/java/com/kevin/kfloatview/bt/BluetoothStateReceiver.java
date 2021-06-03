@@ -11,10 +11,10 @@ import android.util.Log;
 
 import com.kevin.kfloatview.bt.adapter.BtSettingDeviceInfo;
 
-import java.security.Key;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.Objects;
 import java.util.Set;
 import java.util.concurrent.ConcurrentLinkedQueue;
 
@@ -28,10 +28,10 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
     private final ArrayList<BtSettingDeviceInfo> mCacheFindDevs = new ArrayList<>();
     private final HashMap<String, BtSettingDeviceInfo> mMapCacheFindDevs = new HashMap<>(DEFAULT_SCAN_DEV_NUMBER);
 
-    private final BluetoothAdapter mAdapter;
+    private final BluetoothService mBtService;
     private IBluetoothStateCallBack mCallBack;
 
-    public BluetoothStateReceiver(BluetoothAdapter adapter) {
+    public BluetoothStateReceiver(BluetoothService bluetoothService) {
 
         mBtStateFilter = new IntentFilter();
         //蓝牙适配器
@@ -53,7 +53,7 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
        /* mConQueue.add();
         mConQueue.poll()*/
 
-        mAdapter = adapter;
+        mBtService = bluetoothService;
     }
 
     public void setCallBack(IBluetoothStateCallBack callBack) {
@@ -64,33 +64,59 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
         return mBtStateFilter;
     }
 
-    private void sendStatueCode(@IBluetoothStateCallBack.BtStateCode int stateCode) {
+    public void sendStateCode(@IBluetoothStateCallBack.BtStateCode int stateCode) {
         if (mCallBack != null)
-            mCallBack.otherState(stateCode, "");
+            mCallBack.otherState(stateCode, null);
+    }
+
+    public void sendStateCode(@IBluetoothStateCallBack.BtStateCode int stateCode, BluetoothDevice bluetoothDevice) {
+        if (mCallBack != null)
+            mCallBack.otherState(stateCode, bluetoothDevice);
+    }
+
+    /**
+     * 过滤掉发现设备的map中已经绑定的设备
+     */
+    private void filterBondedDevsInFindMap() {
+        Set<BluetoothDevice> set = mBtService.getBondedDevs();
+        if (set != null) {
+            int proSize = mMapCacheFindDevs.size();
+            for (BluetoothDevice dev : set) {
+                mMapCacheFindDevs.remove(dev.getName());
+            }
+            int afterSize = mMapCacheFindDevs.size();
+            if (proSize - afterSize >= 1)
+                sendFindDevsInHashMap();
+        }
     }
 
     @Override
     public void onReceive(Context context, Intent intent) {
         String action = intent.getAction();
-        Log.e(TAG, "onReceive: 蓝牙监听广播: action:" + action);
-        Log.e(TAG, "onReceive: 蓝牙监听广播: intent:" + intent.toString());
+        /*if (DEBUG) {
+            Log.e(TAG, "onReceive: 蓝牙监听广播: action:" + action);
+            Log.e(TAG, "onReceive: 蓝牙监听广播: intent:" + intent.toString());
+        }*/
         if (action != null) {
             switch (action) {
                 //Todo 蓝牙adapter
                 case BluetoothAdapter.ACTION_SCAN_MODE_CHANGED:
                 case BluetoothAdapter.ACTION_STATE_CHANGED:
-                case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED:
                 case BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED:
                     break; //上面为暂未处理action
+                case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED:
+                    aConnectionStateChanged(intent);
+                    break;
                 case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
-                    //sendFindDevsInHashMap();
-                    sendStatueCode(IBluetoothStateCallBack.BT_CODE_DISCOVERY_FINISHED);
+                    Log.e(TAG, "onReceive: ACTION_DISCOVERY_FINISHED");
+                    sendStateCode(IBluetoothStateCallBack.BT_CODE_DISCOVERY_FINISHED);
+                    //filterBondedDevsInFindMap();
                     break;
                 case BluetoothAdapter.ACTION_DISCOVERY_STARTED:
+                    Log.e(TAG, "onReceive: ACTION_DISCOVERY_STARTED");
                     mCacheFindDevs.clear();
                     mMapCacheFindDevs.clear();
-                    mCacheCount = 0;
-                    sendStatueCode(IBluetoothStateCallBack.BT_CODE_DISCOVERY_START);
+                    sendStateCode(IBluetoothStateCallBack.BT_CODE_DISCOVERY_START);
                     break;
                 case BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE:
                     Log.e(TAG, "onReceive: 请求自身蓝牙可被发现");
@@ -116,45 +142,85 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
         }
     }
 
+    private void aConnectionStateChanged(Intent intent) {
+        BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
+        int curState = intent.getIntExtra(BluetoothAdapter.EXTRA_CONNECTION_STATE, -1);
+        int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_CONNECTION_STATE, -1);
+
+        if (DEBUG) {
+            Log.e(TAG, "aConnectionStateChanged: 设备名字:" + device.getName());
+            Log.e(TAG, "aConnectionStateChanged: previousState:" + getConnectValue(previousState));
+            Log.e(TAG, "aConnectionStateChanged: curState:" + getConnectValue(curState));
+        }
+    }
+
     private void aBtEnableState(Intent intent) {
         boolean isOk = intent.getBooleanExtra(BluetoothPmActivity.EXTRA_NAME, false);
         Log.e(TAG, "aBtEnableState: " + isOk);
-        sendStatueCode(isOk ? IBluetoothStateCallBack.BT_CODE_ENABLE_SUCCESS : IBluetoothStateCallBack.BT_CODE_ENABLE_FAILED);
+        sendStateCode(isOk ? IBluetoothStateCallBack.BT_CODE_ENABLE_SUCCESS : IBluetoothStateCallBack.BT_CODE_ENABLE_FAILED);
     }
 
     private void aLocationGrantState(Intent intent) {
         boolean isOk = intent.getBooleanExtra(BluetoothPmActivity.EXTRA_NAME, false);
         Log.e(TAG, "aLocationGrantState: " + isOk);
-        sendStatueCode(isOk ? IBluetoothStateCallBack.BT_CODE_LOC_GRANT_SUCCESS : IBluetoothStateCallBack.BT_CODE_LOC_GRANT_FAILED);
+        sendStateCode(isOk ? IBluetoothStateCallBack.BT_CODE_LOC_GRANT_SUCCESS : IBluetoothStateCallBack.BT_CODE_LOC_GRANT_FAILED);
     }
 
     private void aBondStateChanged(Intent intent) {
         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-        int bondState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
+        int curState = intent.getIntExtra(BluetoothDevice.EXTRA_BOND_STATE, -1);
         int previousState = intent.getIntExtra(BluetoothDevice.EXTRA_PREVIOUS_BOND_STATE, -1);
 
-        Log.e(TAG, "aBondStateChanged: bondState:" + bondState);
-        Log.e(TAG, "aBondStateChanged: previousState:" + previousState);
+        if (DEBUG) {
+            Log.e(TAG, "aBondStateChanged: 设备名字:" + device.getName());
+            Log.e(TAG, "aBondStateChanged: previousState:" + getBondValue(previousState));
+            Log.e(TAG, "aBondStateChanged: curState:" + getBondValue(curState));
+        }
 
-        if (device.getBondState() == BluetoothDevice.BOND_BONDED) {
-            //Toast.makeText(BluetoothService.this, "配对成功:" + device.getName(), Toast.LENGTH_SHORT).show();
+        if (previousState == BluetoothDevice.BOND_BONDING && curState == BluetoothDevice.BOND_BONDED) {
+            if (mMapCacheFindDevs.remove(device.getName()) != null) //将已绑定的设备从发现的设备集合中移除
+                sendFindDevsInHashMap();
+            sendStateCode(IBluetoothStateCallBack.BT_CODE_BONDED);
+            mBtService.sendCurBondedDevs();
+            Log.e(TAG, "aBondStateChanged: 有设备绑定成功+++++");
+        } else if (previousState == BluetoothDevice.BOND_BONDED && curState == BluetoothDevice.BOND_NONE) {
+            sendStateCode(IBluetoothStateCallBack.BT_CODE_UN_BONDED);
+            mBtService.sendCurBondedDevs();
+            Log.e(TAG, "aBondStateChanged: 有设备解绑成功-----");
         }
     }
 
-    /**
-     * 生成小于DEFAULT_SCAN_DEV_NUMBER的随机整数
-     */
-    private int generateRandom() {
-        return (int) (Math.random() * DEFAULT_SCAN_DEV_NUMBER);
+    private String getBondValue(int state) {
+        switch (state) {
+            case BluetoothDevice.BOND_NONE:
+                return "没有绑定";
+            case BluetoothDevice.BOND_BONDING:
+                return "绑定中...";
+            case BluetoothDevice.BOND_BONDED:
+                return "绑定完成";
+        }
+        return "未知状态";
     }
 
-    private int mCacheCount;
+    private String getConnectValue(int state) {
+        switch (state) {
+            case BluetoothAdapter.STATE_CONNECTED:
+                return "连接成功";
+            case BluetoothAdapter.STATE_CONNECTING:
+                return "连接中...";
+            case BluetoothAdapter.STATE_DISCONNECTED:
+                return "已断开";
+            case BluetoothAdapter.STATE_DISCONNECTING:
+                return "断开中...";
+        }
+        return "未知状态";
+    }
+
 
     /**
      * 将hashMap中扫描到的设备，通过接口回调
      */
     private void sendFindDevsInHashMap() {
-        //if (mCallBack != null && mMapCacheFindDevs.size() <= generateRandom()) {
         if (mCallBack != null && mMapCacheFindDevs.size() > 0) {
             mCacheFindDevs.clear();
             Set<Map.Entry<String, BtSettingDeviceInfo>> sets = mMapCacheFindDevs.entrySet();
@@ -162,41 +228,34 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
                 mCacheFindDevs.add(set.getValue());
             }
             mCallBack.updateScanDevs(mCacheFindDevs);
-            ++mCacheCount;
-            Log.e("Kevin", "aDevicesFind: 接口回调次数:" + mCacheCount);
         }
     }
 
     private void aDevicesFind(Intent intent) {
         BluetoothDevice device = intent.getParcelableExtra(BluetoothDevice.EXTRA_DEVICE);
-        Log.e(TAG, "aDevicesFind: device:" + device);
+        //Log.e(TAG, "aDevicesFind: device:" + device);
         if (device != null) {
-            String devName = device.getName();
-            String devMac = device.getAddress();
+            String findName = device.getName();
+            String findMac = device.getAddress();
             if (DEBUG) {
-                Log.d(TAG, "aDevicesFind: 设备名字:" + devName);
-                Log.d(TAG, "aDevicesFind: 物理地址:" + devMac);
+                Log.d(TAG, "aDevicesFind: 设备名字:" + findName);
+                Log.d(TAG, "aDevicesFind: 物理地址:" + findMac);
             }
-            if (devName != null) {
-                Log.e(TAG, "aDevicesFind: mCacheFindDevs:" + mCacheFindDevs + "hashCode:" + mCacheFindDevs.hashCode());
-                //通过HashMap去重复
+            if (findName != null) {
                 int proSize = mMapCacheFindDevs.size();
-                mMapCacheFindDevs.put(devName, new BtSettingDeviceInfo(device, false));
+                Set<BluetoothDevice> set = mBtService.getBondedDevs();
+                if (set != null) {
+                    for (BluetoothDevice bondedDev : set) {
+                        if (!Objects.equals(bondedDev.getName(), findName)) //只将不在已经绑定的集合中的新设备添加到发现的设备集合中
+                            mMapCacheFindDevs.put(findName, new BtSettingDeviceInfo(device, false));//通过HashMap去重
+                    }
+                }
                 int afterSize = mMapCacheFindDevs.size();
                 if (afterSize - proSize >= 1)//说明有新的设备发现
                     sendFindDevsInHashMap();
+                filterBondedDevsInFindMap();
                 if (mMapCacheFindDevs.size() >= DEFAULT_SCAN_DEV_NUMBER)
-                    mAdapter.cancelDiscovery();
-            }
-
-            //if ("FXNB-868681042704138".equals(devName)) {
-            //.if ("Printer_E4BA".equals(devName)) {
-            //if ("NP100S31B3".equals(devName)) {
-            //Log.e(TAG, "aDevicesFind: devname:length="+devName.length()+" "+"NP100S31B3".length());
-            if ("NP100S31B3  ".equals(devName)) {
-                //if ("DESKTOP-2D8RTSR".equals(devName)) {
-                Log.e(TAG, "aDevicesFind: ----发现指定设备-----");
-                Log.e(TAG, "aDevicesFind: 绑定状态:" + device.getBondState());
+                    mBtService.scanBluetooth(false);
             }
         }
     }

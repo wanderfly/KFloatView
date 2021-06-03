@@ -10,6 +10,7 @@ import android.content.Intent;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
+import android.os.Looper;
 import android.os.Message;
 import android.util.Log;
 import android.view.Gravity;
@@ -19,6 +20,7 @@ import android.widget.FrameLayout;
 import android.widget.ImageView;
 import android.widget.Toast;
 
+import androidx.annotation.IntDef;
 import androidx.annotation.NonNull;
 import androidx.annotation.Nullable;
 
@@ -29,6 +31,9 @@ import com.kevin.kfloatview.bt.floatview.EnFloatingView;
 import java.io.IOException;
 import java.io.OutputStream;
 import java.io.UnsupportedEncodingException;
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
+import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Map;
@@ -71,6 +76,7 @@ public class BluetoothService extends Service {
     private BluetoothPmActivity mActivity;
     private FrameLayout mContainer;
     private final HashMap<String, View> mViewMaps = new HashMap<>();
+    private BtServiceHandler mHandler;
 
     @Override
     public void onCreate() {
@@ -78,6 +84,7 @@ public class BluetoothService extends Service {
         super.onCreate();
         BluetoothManager bm = (BluetoothManager) getSystemService(Service.BLUETOOTH_SERVICE);
         mAdapter = bm.getAdapter();
+        mHandler = new BtServiceHandler(Looper.getMainLooper(), this);
         initBluetoothFilter();
     }
 
@@ -96,7 +103,7 @@ public class BluetoothService extends Service {
 
     @Override
     public int onStartCommand(Intent intent, int flags, int startId) {
-        Log.e(TAG, "onStartCommand: " + intent.getAction());
+        //Log.e(TAG, "onStartCommand: " + intent.getAction());
         //Bundle bundle = intent.getBundleExtra(ACTIVITY_EXTRA_NAME);
         return super.onStartCommand(intent, flags, startId);
     }
@@ -139,17 +146,26 @@ public class BluetoothService extends Service {
         mIBluetoothStateCallBack = callback;
         if (mBtStateReceiver != null)
             mBtStateReceiver.setCallBack(callback);
+        sendCurBondedDevs();
+    }
+
+    @Nullable
+    public Set<BluetoothDevice> getBondedDevs() {
+        return mAdapter.getBondedDevices();
+    }
+
+    public void sendCurBondedDevs() {
         if (mIBluetoothStateCallBack != null) {
-            Set<BluetoothDevice> devs = mAdapter.getBondedDevices();
+            Set<BluetoothDevice> devs = getBondedDevs();
             if (devs != null) {
                 int devsSize = devs.size();
+                ArrayList<BtSettingDeviceInfo> deviceInfos = new ArrayList<>();
                 if (devsSize > 0) {
-                    ArrayList<BtSettingDeviceInfo> deviceInfos = new ArrayList<>();
                     if (mBluetoothSocket != null && mBluetoothSocket.isConnected()) {
                         BluetoothDevice connectedDev = mBluetoothSocket.getRemoteDevice();
                         int i = 1;
                         for (BluetoothDevice bondedDev : devs) {
-                            if (Objects.equals(connectedDev.getName(), bondedDev.getName())) //将连接的设备放在集合首位
+                            if (isSameDev(connectedDev, bondedDev)) //将连接的设备放在集合首位
                                 deviceInfos.add(0, new BtSettingDeviceInfo(bondedDev, true));
                             else
                                 deviceInfos.add(i++, new BtSettingDeviceInfo(bondedDev, false));
@@ -159,10 +175,15 @@ public class BluetoothService extends Service {
                             deviceInfos.add(new BtSettingDeviceInfo(bondedDev, false));
                         }
                     }
-                    mIBluetoothStateCallBack.updateBondedDevs(deviceInfos);
                 }
+                mIBluetoothStateCallBack.updateBondedDevs(deviceInfos);
             }
         }
+    }
+
+    private boolean isSameDev(@NonNull BluetoothDevice connectedDev,
+                              @NonNull BluetoothDevice bondedDev) {
+        return Objects.equals(connectedDev.getName(), bondedDev.getName());
     }
 
 
@@ -259,72 +280,92 @@ public class BluetoothService extends Service {
         startActivity(discoverableIntent);
     }
 
-    private Set<BluetoothDevice> getBondedDevices() {
-        Set<BluetoothDevice> pairedDevices = mAdapter.getBondedDevices();
-        if (pairedDevices.size() > 0) {
-            mSBuilder.setLength(0);
-            for (BluetoothDevice device : pairedDevices) {
-                String deviceName = device.getName();
-                String deviceHardwareAddress = device.getAddress();//MAC address
-                if (DEBUG) {
-                    Log.d(TAG, "getBondedDevices: 设备名字:" + deviceName);
-                    Log.d(TAG, "getBondedDevices: 设备地址:" + deviceHardwareAddress);
-                }
-                mSBuilder.append("设备名字:")
-                        .append(deviceName)
-                        .append("\n")
-                        .append("设备地址:")
-                        .append(deviceHardwareAddress)
-                        .append("\n\n");
-            }
-            // mTvContent.setText(mSBuilder.toString());
-        }
-        return pairedDevices;
+
+    /**
+     * 说明:
+     * 1.失败、成功 -->这两个状态可以立即拿到结果
+     * 2.进行中    -->为异步处理结果
+     */
+    public static final int BOND_FAILED = 0; //(解绑)绑定 失败
+    public static final int BOND_SUCCESS = 1;//(解绑)绑定 成功
+    public static final int BOND_ING = 2;    //(解绑)绑定 进行中 (需要等待广播结果)
+
+    @IntDef({BOND_FAILED, BOND_SUCCESS, BOND_ING})
+    @Retention(RetentionPolicy.SOURCE)
+    @interface BondCode {
+
     }
 
-    private boolean bondDevices(BluetoothDevice device) {
+    @BondCode
+    public int unBondDevice(BluetoothDevice device) {
         if (device == null)
-            return false;
-        if (isBonded(device) || isBonding(device))
-            return true;
-        if (isBondNo(device)) {
-            try {
-                return BlueToothUtil.createBond(BluetoothDevice.class, device);
+            return BOND_FAILED;
+        if (isBondNo(device))
+            return BOND_SUCCESS;
+        if (isBonding(device) || isBonded(device)) {
+            try {//注:解绑设备 方法说明中 没有表明为异步处理，这里按照还是按照异步的思维处理(在广播中获取结果)
+                //@see BluetoothDevice#removeBond()
+                return BlueToothUtil.removeBond(BluetoothDevice.class, device) ? BOND_ING : BOND_FAILED;
             } catch (Exception e) {
                 e.printStackTrace();
-                return false;
             }
         }
-        return true;
+        return BOND_FAILED;
     }
 
-    private boolean isBonding(BluetoothDevice device) {
+    @BondCode
+    public int bondDevice(BluetoothDevice device) {
+        if (device == null)
+            return BOND_FAILED;
+        if (isBonded(device))
+            return BOND_SUCCESS;
+        if (isBonding(device))
+            return BOND_ING;
+        if (isBondNo(device)) {
+            try {
+                //return BlueToothUtil.createBond(BluetoothDevice.class, device);
+                return device.createBond() ? BOND_ING : BOND_FAILED;
+            } catch (Exception e) {
+                e.printStackTrace();
+            }
+        }
+        return BOND_FAILED;
+    }
+
+    private boolean isBonding(@NonNull BluetoothDevice device) {
         return BluetoothDevice.BOND_BONDING == device.getBondState();
     }
 
-    private boolean isBonded(BluetoothDevice device) {
+    private boolean isBonded(@NonNull BluetoothDevice device) {
         return BluetoothDevice.BOND_BONDED == device.getBondState();
     }
 
-    private boolean isBondNo(BluetoothDevice device) {
+    private boolean isBondNo(@NonNull BluetoothDevice device) {
         return BluetoothDevice.BOND_NONE == device.getBondState();
     }
 
-    private void connect(final BluetoothDevice device) {
+    public void connect(final BluetoothDevice device) {
         if (isBonded(device)) {
             new Thread() {
                 @Override
                 public void run() {
                     try {
                         if (isBonded(device)) {
-                            sleep(1000);
+
+                            sleep(100);
                             Log.d(TAG, "run: 开启新线程去连接蓝牙:");
+                            mHandler.sendEmptyMessage(MSG_CONNECT_START);
+                            if (mBluetoothSocket != null && mBluetoothSocket.isConnected()){
+                                Log.e(TAG, "run: 当前设备已连接,正关闭当前设备连接，切换到新设备  当前连接设备:"+mBluetoothSocket.getRemoteDevice().getName());
+                                mBluetoothSocket.close();
+                            }
 
                             mBluetoothSocket = device.createRfcommSocketToServiceRecord(uuid);
                             mAdapter.cancelDiscovery();
-                            //mAdapter.enable();
                             mBluetoothSocket.connect();
-                            printBluetoothInfo();
+                            mHandler.sendEmptyMessage(mBluetoothSocket.isConnected() ? MSG_CONNECT_SUCCESS : MSG_CONNECT_FAILED);
+                            //printBluetoothInfo();
+                            //printInfo();
                         }
                     } catch (Exception e) {
                         e.printStackTrace();
@@ -335,12 +376,13 @@ public class BluetoothService extends Service {
                                 ioException.printStackTrace();
                             }
                         }
+                        mHandler.sendEmptyMessage(MSG_CONNECT_FAILED);
                     }
                 }
             }.start();
         } else {
             Toast.makeText(this, "请先配对", Toast.LENGTH_SHORT).show();
-            bondDevices(device);
+            bondDevice(device);
         }
     }
 
@@ -354,7 +396,7 @@ public class BluetoothService extends Service {
         }
     }
 
-    private void printInfo() {
+    public void printInfo() {
         if (mBluetoothSocket != null && mBluetoothSocket.isConnected()) {
             new Thread() {
                 @Override
@@ -491,7 +533,7 @@ public class BluetoothService extends Service {
     private void initBluetoothFilter() {
 
         if (mBtStateReceiver == null)
-            mBtStateReceiver = new BluetoothStateReceiver(mAdapter);
+            mBtStateReceiver = new BluetoothStateReceiver(this);
         registerReceiver(mBtStateReceiver, mBtStateReceiver.getBtStateFilter());
     }
 
@@ -501,31 +543,35 @@ public class BluetoothService extends Service {
     }
 
 
-    private static final int MSG_BOND_BLUETOOTH_DEVICE = 0;
-    private static final int MSG_CONNECT_BLUETOOTH_DEVICE = 1;
-    private static final int MSG_CONNECT_BLE_BLUETOOTH_DEVICE = 2;
-    private static final int MSG_CLOSE_BLE_CONNECT = 3;
-    private static final int MSG_CONNECT_OTHER = 20;
-    private final Handler mHandler = new Handler(new Handler.Callback() {
+    private static final int MSG_CONNECT_START = 0;
+    private static final int MSG_CONNECT_SUCCESS = 1;
+    private static final int MSG_CONNECT_FAILED = 2;
+
+    private static final class BtServiceHandler extends Handler {
+        WeakReference<BluetoothService> wk;
+
+        public BtServiceHandler(@NonNull Looper looper, BluetoothService bluetoothService) {
+            super(looper);
+            wk = new WeakReference<>(bluetoothService);
+        }
+
         @Override
-        public boolean handleMessage(@NonNull Message message) {
-            switch (message.what) {
-                case MSG_BOND_BLUETOOTH_DEVICE:
-                    bondDevices((BluetoothDevice) message.obj);
+        public void handleMessage(@NonNull Message msg) {
+            BluetoothService service = wk.get();
+            if (service == null)
+                return;
+            switch (msg.what) {
+                case MSG_CONNECT_START:
+                    service.mBtStateReceiver.sendStateCode(IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_START);
                     break;
-                case MSG_CONNECT_BLUETOOTH_DEVICE:
-                    connect((BluetoothDevice) message.obj);
+                case MSG_CONNECT_SUCCESS:
+                    service.mBtStateReceiver.sendStateCode(IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_SUCCESS);
+                    service.sendCurBondedDevs();
                     break;
-                case MSG_CONNECT_BLE_BLUETOOTH_DEVICE:
-                    //connectBle((BluetoothDevice) message.obj);
-                    break;
-                case MSG_CLOSE_BLE_CONNECT:
-                    //closeBluetoothBleGatt();
-                    break;
-                case MSG_CONNECT_OTHER:
+                case MSG_CONNECT_FAILED:
+                    service.mBtStateReceiver.sendStateCode(IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_FAILED);
                     break;
             }
-            return false;
         }
-    });
+    }
 }

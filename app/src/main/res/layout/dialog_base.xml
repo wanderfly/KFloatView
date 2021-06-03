@@ -1,0 +1,68 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:tools="http://schemas.android.com/tools"
+    android:layout_width="match_parent"
+    android:layout_height="wrap_content"
+    android:layout_centerInParent="true"
+    android:background="@drawable/shape_base_dialog"
+    android:minWidth="280dp"
+    android:orientation="vertical">
+
+    <TextView
+        android:id="@+id/fx_dialog_title"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_margin="20dp"
+        android:gravity="center"
+        android:textColor="#333333"
+        android:textSize="18sp"
+        android:visibility="visible"
+        tools:text="操作提醒" />
+
+
+    <TextView
+        android:id="@+id/fx_dialog_content"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_marginLeft="20dp"
+        android:layout_marginRight="20dp"
+        android:lineSpacingExtra="3dp"
+        android:textColor="#999999"
+        android:textSize="14sp"
+        tools:text="确认退出登录" />
+
+    <RelativeLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content">
+        <Button
+            android:id="@+id/fx_dialog_positive"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_alignParentEnd="true"
+            android:background="@null"
+            android:gravity="center"
+            android:paddingTop="20dp"
+            android:paddingBottom="20dp"
+            android:layout_marginEnd="20dp"
+            android:singleLine="true"
+            android:textColor="@color/selector_fx_dialog_text_ok"
+            android:textSize="16sp"
+            tools:text="确定" />
+        <Button
+            android:id="@+id/fx_dialog_negative"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_toStartOf="@id/fx_dialog_positive"
+            android:background="@null"
+            android:gravity="center"
+            android:paddingTop="20dp"
+            android:paddingBottom="20dp"
+            android:layout_marginEnd="40dp"
+            android:singleLine="true"
+            android:textColor="@color/selector_fx_dialog_text_cancel"
+            android:textSize="16sp"
+            tools:text="取消" />
+
+
+    </RelativeLayout>
+</LinearLayout>

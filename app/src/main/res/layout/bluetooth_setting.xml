@@ -79,7 +79,9 @@
         android:layout_below="@id/iv_bt_setting_circle"
         android:layout_centerHorizontal="true"
         android:layout_marginTop="15dp"
-        android:text="搜索设备中..." />
+        android:text="搜索设备中..."
+        android:textColor="@android:color/white"
+        android:textSize="15sp" />
 
     <View
         android:layout_width="match_parent"
@@ -137,7 +139,9 @@
                 android:layout_marginTop="15dp" />
 
         </LinearLayout>
-
     </androidx.core.widget.NestedScrollView>
+
+    <include layout="@layout/bluetooth_setting_connect_loading"/>
+
 
 </RelativeLayout>

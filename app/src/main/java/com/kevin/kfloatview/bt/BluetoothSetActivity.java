@@ -2,21 +2,25 @@ package com.kevin.kfloatview.bt;
 
 
 import android.annotation.SuppressLint;
+import android.bluetooth.BluetoothDevice;
 import android.content.ComponentName;
 import android.content.Intent;
 import android.content.ServiceConnection;
 import android.graphics.drawable.AnimationDrawable;
 import android.os.Bundle;
+import android.os.Handler;
 import android.os.IBinder;
 import android.util.Log;
 import android.view.View;
 import android.widget.ImageView;
+import android.widget.RelativeLayout;
 import android.widget.TextView;
 
 import androidx.annotation.Nullable;
 import androidx.recyclerview.widget.LinearLayoutManager;
 import androidx.recyclerview.widget.RecyclerView;
 
+import com.kevin.kfloatview.FxDialog;
 import com.kevin.kfloatview.R;
 import com.kevin.kfloatview.bt.adapter.BtSettingDeviceAdapter;
 import com.kevin.kfloatview.bt.adapter.BtSettingDeviceInfo;
@@ -34,14 +38,24 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
     private static final String SCAN_STATE_ING = "搜索设备中...";
     private static final String SCAN_STATE_FINISHED = "搜索完成";
 
+    /**
+     * 蓝牙连接步骤:
+     * 未绑定 --> 准备绑定 --> 绑定中 --> 绑定完成 --> 连接蓝牙设备
+     */
+    private boolean mIsBonding;   //绑定中
+    private boolean mIsUnBonding; //解绑中
+    private boolean mIsConnecting;//连接中
+
     private BtServiceConnected mBtServiceConnected;
     private BtStateCallBack mBtStateCallback;
     private BluetoothService mBtService;
     private BluetoothBinder mBtBinder;
 
+    private RelativeLayout mRlLoadView;
     private TextView mTvBtScanState;
     private TextView mTvBondedDevs;
     private TextView mTvScanDevs;
+    private TextView mTvProConnectState;
 
     private ImageView mIvLeftAnim;
     private ImageView mIvRightAnim;
@@ -63,7 +77,11 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
         mTvBtScanState = findViewById(R.id.tv_bt_setting_scan_state);
         mTvBondedDevs = findViewById(R.id.tv_bt_setting_bonded_devices_title);
         mTvScanDevs = findViewById(R.id.tv_bt_setting_scan_devices_title);
+        mTvProConnectState = findViewById(R.id.tv_bt_setting_load_view_connect_state);
         mTvBtScanState.setText(SCAN_STATE_DEFAULT);
+
+        mRlLoadView = findViewById(R.id.rl_bt_setting_load_view);
+        mRlLoadView.setVisibility(View.GONE);
 
         findViewById(R.id.iv_bt_setting_close).setOnClickListener(this);
         findViewById(R.id.iv_bt_setting_circle).setOnClickListener(this);
@@ -88,9 +106,48 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
         mRcBondedDevs.setLayoutManager(linearLayoutManager);
         mAdapterBonded = new BtSettingDeviceAdapter(this, new ArrayList<>());
         mRcBondedDevs.setAdapter(mAdapterBonded);
-        mAdapterBonded.setOnItemClickListener((view, position) -> {
+        mAdapterBonded.setOnItemClickListener(new BtSettingDeviceAdapter.OnItemClickListener() {
+            @Override
+            public void onItemClick(View view, int position) {
+                BtSettingDeviceInfo dev = mAdapterBonded.getItemDevice(position);
+                if (dev != null) {
+                    Log.e(TAG, "onItemClick: position:" + position + " name:" + dev.getBtDevice().getName());
+                    if (!mIsConnecting && mBtService != null) {
+                        mIsConnecting = true;
+                        mBtService.connect(dev.getBtDevice());
+                    }
+                }
+            }
 
-            Log.e(TAG, "initRcBondedDevices: position:" + position);
+            @Override
+            public void onItemLongClick(View view, int position) {
+                FxDialog dialog = new FxDialog(BluetoothSetActivity.this);
+                dialog.setTitle("取消配对").setContent("确定取消配对?").setOnClickBottomListener(new FxDialog.OnClickBottomListener() {
+                    @Override
+                    public void onPositiveClick() {
+                        BtSettingDeviceInfo dev = mAdapterBonded.getItemDevice(position);
+                        if (dev != null) {
+                            Log.e(TAG, "onItemClick: position:" + position + " name:" + dev.getBtDevice().getName());
+                            if (!mIsUnBonding && mBtService != null) {
+                                switch (mBtService.unBondDevice(dev.getBtDevice())) {
+                                    case BluetoothService.BOND_FAILED:
+                                    case BluetoothService.BOND_SUCCESS:
+                                        break;
+                                    case BluetoothService.BOND_ING:
+                                        mIsUnBonding = true;
+                                        break;
+                                }
+                            }
+                        }
+                        dialog.dismiss();
+                    }
+
+                    @Override
+                    public void onNegativeClick() {
+                        dialog.dismiss();
+                    }
+                }).show();
+            }
         });
     }
 
@@ -104,7 +161,25 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
         mAdapterScan.setOnItemClickListener(new BtSettingDeviceAdapter.OnItemClickListener() {
             @Override
             public void onItemClick(View view, int position) {
-                Log.e(TAG, "onItemClick: position:" + position);
+                BtSettingDeviceInfo dev = mAdapterScan.getItemDevice(position);
+                if (dev != null) {
+                    Log.e(TAG, "onItemClick: position:" + position + " name:" + dev.getBtDevice().getName());
+                    if (!mIsBonding && mBtService != null) {
+                        switch (mBtService.bondDevice(dev.getBtDevice())) {
+                            case BluetoothService.BOND_FAILED:
+                            case BluetoothService.BOND_SUCCESS:
+                                break;
+                            case BluetoothService.BOND_ING:
+                                mIsBonding = true;
+                                break;
+                        }
+                    }
+                }
+            }
+
+            @Override
+            public void onItemLongClick(View view, int position) {
+
             }
         });
     }
@@ -112,8 +187,9 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
     @Override
     protected void onStart() {
         super.onStart();
-        if (!hasLocationPermission())
-            reqLocationPermission();
+        if (!hasLocationPermission()) {
+            new Handler().postDelayed(this::reqLocationPermission, 500);
+        }
     }
 
     @Override
@@ -140,7 +216,9 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
         Log.e(TAG, "onClick: id:" + v.getId());
         switch (v.getId()) {
             case R.id.iv_bt_setting_close:
-                finish();
+                //finish();
+                //if (mBtService != null) mBtService.closeBluetooth();
+                mBtService.printInfo();
                 break;
             case R.id.iv_bt_setting_circle:
                 if (Objects.equals(SCAN_STATE_DEFAULT, mTvBtScanState.getText().toString())) {
@@ -231,7 +309,7 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
 
         @Override
         public void updateBondedDevs(@NotNull ArrayList<BtSettingDeviceInfo> bondedDevs) {
-            Log.e(TAG, "updateBondedDevs: --------------bondedDevs:" + bondedDevs);
+            Log.e(TAG, "updateBondedDevs: --------------bondedDevs:");
             mAdapterBonded.updateBondedDevices(bondedDevs);
             String value = "已配对设备(" + bondedDevs.size() + ")";
             mTvBondedDevs.setText(value);
@@ -239,14 +317,14 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
 
         @Override
         public void updateScanDevs(@NotNull ArrayList<BtSettingDeviceInfo> scanDevs) {
-            Log.e(TAG, "updateScanDevs: ---------------scanDevs:" + scanDevs + " hashCode:" + scanDevs.hashCode());
+            Log.e(TAG, "updateScanDevs: ---------------scanDevs:");
             mAdapterScan.updateBondedDevices(scanDevs);
             String value = "其它设备(" + scanDevs.size() + ")";
             mTvScanDevs.setText(value);
         }
 
         @Override
-        public void otherState(@BtStateCode int stateCode, @Nullable String stateInfo) {
+        public void otherState(int stateCode, @Nullable BluetoothDevice bluetoothDevice) {
             switch (stateCode) {
                 case IBluetoothStateCallBack.BT_CODE_DISCOVERY_START:
                     mIvLeftAnim.setVisibility(View.VISIBLE);
@@ -263,14 +341,36 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
                     mIvRightAnim.setVisibility(View.INVISIBLE);
                     break;
                 case IBluetoothStateCallBack.BT_CODE_LOC_GRANT_SUCCESS:
+                    startDiscovery();
                     break;
                 case IBluetoothStateCallBack.BT_CODE_LOC_GRANT_FAILED:
                     break;
                 case IBluetoothStateCallBack.BT_CODE_ENABLE_SUCCESS:
+                    startDiscovery();
                     break;
                 case IBluetoothStateCallBack.BT_CODE_ENABLE_FAILED:
                     break;
-
+                case IBluetoothStateCallBack.BT_CODE_BONDED:
+                    mIsBonding = false;
+                    break;
+                case IBluetoothStateCallBack.BT_CODE_UN_BONDED:
+                    mIsUnBonding = false;
+                    break;
+                case IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_START:
+                    mIsConnecting = true;
+                    mRlLoadView.setVisibility(View.VISIBLE);
+                    mTvProConnectState.setText("设备连接中..请稍等");
+                    break;
+                case IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_SUCCESS:
+                    mIsConnecting = false;
+                    mTvProConnectState.setText("设备连成功");
+                    mRlLoadView.setVisibility(View.GONE);
+                    break;
+                case IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_FAILED:
+                    mIsConnecting = false;
+                    mTvProConnectState.setText("设备连失败");
+                    mRlLoadView.setVisibility(View.GONE);
+                    break;
             }
         }
     }
