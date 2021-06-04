@@ -5,8 +5,11 @@ import android.app.Service;
 import android.bluetooth.BluetoothAdapter;
 import android.bluetooth.BluetoothDevice;
 import android.bluetooth.BluetoothManager;
+import android.bluetooth.BluetoothProfile;
 import android.bluetooth.BluetoothSocket;
 import android.content.Intent;
+import android.graphics.Bitmap;
+import android.graphics.BitmapFactory;
 import android.os.Build;
 import android.os.Handler;
 import android.os.IBinder;
@@ -18,6 +21,7 @@ import android.view.View;
 import android.widget.Button;
 import android.widget.FrameLayout;
 import android.widget.ImageView;
+import android.widget.TextView;
 import android.widget.Toast;
 
 import androidx.annotation.IntDef;
@@ -27,6 +31,8 @@ import androidx.annotation.Nullable;
 import com.kevin.kfloatview.R;
 import com.kevin.kfloatview.bt.adapter.BtSettingDeviceInfo;
 import com.kevin.kfloatview.bt.floatview.EnFloatingView;
+import com.tools.command.EscCommand;
+import com.tools.command.LabelCommand;
 
 import java.io.IOException;
 import java.io.OutputStream;
@@ -36,6 +42,7 @@ import java.lang.annotation.RetentionPolicy;
 import java.lang.ref.WeakReference;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Objects;
 import java.util.Set;
@@ -69,12 +76,13 @@ public class BluetoothService extends Service {
     private final UUID uuid = UUID.fromString("00001101-0000-1000-8000-00805F9B34FB");
 
     private BluetoothAdapter mAdapter;
-    private BluetoothSocket mBluetoothSocket;
-    private BluetoothDevice mCacheFound;     //缓存指定的蓝牙设备
+    private BluetoothSocket mBluetoothSocket;  //说明:本身蓝牙是支持同时和多个设备通信的，这里结合实际需求，采用单连接方式
     private BluetoothStateReceiver mBtStateReceiver;
 
     private BluetoothPmActivity mActivity;
-    private FrameLayout mContainer;
+    private FrameLayout mFlContainer;  //悬浮窗 容器
+    private TextView mFlTvLinkedState; //悬浮窗 显示打印机连接状态
+    private Button mFlBtnBtSetting;    //悬浮窗 跳转到蓝牙设置页面
     private final HashMap<String, View> mViewMaps = new HashMap<>();
     private BtServiceHandler mHandler;
 
@@ -129,11 +137,11 @@ public class BluetoothService extends Service {
      * 移除当前activity中通过服务添加的所以view
      */
     private void removeActivityAllViews() {
-        if (mActivity != null && mContainer != null) {
+        if (mActivity != null && mFlContainer != null) {
             Log.e(TAG, "removeActivityAllViews: 移除view");
             for (Map.Entry<String, View> map : mViewMaps.entrySet()) {
                 Log.e(TAG, "removeActivityAllViews: key:" + map.getKey() + " value:" + map.getValue());
-                mContainer.removeView(map.getValue());
+                mFlContainer.removeView(map.getValue());
                 mViewMaps.remove(map.getKey());
             }
         }
@@ -154,6 +162,9 @@ public class BluetoothService extends Service {
         return mAdapter.getBondedDevices();
     }
 
+    /**
+     * 通过接口回调发送当前绑定的设备
+     */
     public void sendCurBondedDevs() {
         if (mIBluetoothStateCallBack != null) {
             Set<BluetoothDevice> devs = getBondedDevs();
@@ -163,12 +174,11 @@ public class BluetoothService extends Service {
                 if (devsSize > 0) {
                     if (mBluetoothSocket != null && mBluetoothSocket.isConnected()) {
                         BluetoothDevice connectedDev = mBluetoothSocket.getRemoteDevice();
-                        int i = 1;
                         for (BluetoothDevice bondedDev : devs) {
                             if (isSameDev(connectedDev, bondedDev)) //将连接的设备放在集合首位
                                 deviceInfos.add(0, new BtSettingDeviceInfo(bondedDev, true));
                             else
-                                deviceInfos.add(i++, new BtSettingDeviceInfo(bondedDev, false));
+                                deviceInfos.add(new BtSettingDeviceInfo(bondedDev, false));
                         }
                     } else {
                         for (BluetoothDevice bondedDev : devs) {
@@ -181,9 +191,53 @@ public class BluetoothService extends Service {
         }
     }
 
-    private boolean isSameDev(@NonNull BluetoothDevice connectedDev,
-                              @NonNull BluetoothDevice bondedDev) {
-        return Objects.equals(connectedDev.getName(), bondedDev.getName());
+    private boolean isSameDev(@NonNull BluetoothDevice devOne,
+                              @NonNull BluetoothDevice devTwo) {
+        return Objects.equals(devOne.getName(), devTwo.getName());
+    }
+
+    public void releaseCurConnect() {
+        if (mBluetoothSocket != null) {
+            if (mBluetoothSocket.isConnected()) {
+                try {
+                    mBluetoothSocket.close();
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+            }
+            mBluetoothSocket = null;
+        }
+        setFlowViewContent(false);
+    }
+
+    /**
+     * 判断指定设备是否已经连接
+     */
+    public boolean isConnected(BluetoothDevice device) {
+        if (device == null || mBluetoothSocket == null)
+            return false;
+
+        return mBluetoothSocket.isConnected()
+                && isSameDev(device, mBluetoothSocket.getRemoteDevice());
+    }
+
+    public boolean isConnected() {
+        if (mBluetoothSocket == null)
+            return false;
+
+        return mBluetoothSocket.isConnected();
+    }
+
+    private void setFlowViewContent(boolean isConnected) {
+        if (mActivity != null && mFlContainer != null) {
+            if (isConnected) {
+                mFlTvLinkedState.setText("打印机已连接");
+                mFlBtnBtSetting.setText("切换设备");
+            } else {
+                mFlTvLinkedState.setText("打印机未连接");
+                mFlBtnBtSetting.setText("连接");
+            }
+        }
     }
 
 
@@ -193,7 +247,7 @@ public class BluetoothService extends Service {
 
     public void setCurActivity(BluetoothPmActivity activity) {
         mActivity = activity;
-        mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
+        mFlContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
     }
 
     /**
@@ -206,34 +260,28 @@ public class BluetoothService extends Service {
 
         if (mActivity != null) {
             Log.e(TAG, "showBtStateView: ");
-            if (mContainer == null)
-                mContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
+            if (mFlContainer == null)
+                mFlContainer = mActivity.getWindow().getDecorView().findViewById(android.R.id.content);
 
             //EnFloatingView floatingView= new EnFloatingView(mActivity, R.layout.layout_float_view);
             EnFloatingView floatingView = new EnFloatingView(mActivity, R.layout.bluetooth_min);
             floatingView.setAdsorptionEdge(false);
             floatingView.setLayoutParams(getBtMinLayoutParams());
-            Button btnLink = floatingView.findViewById(R.id.btn_bt_min_link);
-            btnLink.setOnClickListener(v -> {
+            mFlTvLinkedState = floatingView.findViewById(R.id.tv_bt_min_link_state);
+            mFlBtnBtSetting = floatingView.findViewById(R.id.btn_bt_min_link);
+            mFlBtnBtSetting.setOnClickListener(v -> {
                 if (mActivity != null) {
                     Intent intent = new Intent(mActivity, BluetoothSetActivity.class);
                     mActivity.startActivity(intent);
                 }
             });
             ImageView ivClose = floatingView.findViewById(R.id.iv_bt_min_close);
-            ivClose.setOnClickListener(v -> {
-                /*if (mActivity != null && mContainer != null) {
-                    View view = mViewMaps.get(TAG_BT_MIN_LAYOUT);
-                    if (view != null) {
-                        mViewMaps.remove(TAG_BT_MIN_LAYOUT);
-                        mContainer.removeView(view);
-                    }
-                }*/
-                removeActivityAllViews();
-            });
+            ivClose.setOnClickListener(v -> removeActivityAllViews());
             Log.e(TAG, "showBtStateView: parent:" + floatingView.getParent());
-            mContainer.addView(floatingView);
+            mFlContainer.addView(floatingView);
             mViewMaps.put(TAG_BT_MIN_LAYOUT, floatingView);
+            if (isConnected())
+                setFlowViewContent(true);
         }
     }
 
@@ -250,7 +298,7 @@ public class BluetoothService extends Service {
         Log.e(TAG, "releaseCurActivity: mActivity:" + mActivity);
         if (mActivity != null) {
             mActivity = null;
-            mContainer = null;
+            mFlContainer = null;
         }
 
     }
@@ -349,34 +397,33 @@ public class BluetoothService extends Service {
             new Thread() {
                 @Override
                 public void run() {
-                    try {
-                        if (isBonded(device)) {
-
+                    if (isBonded(device)) {
+                        try {
                             sleep(100);
                             Log.d(TAG, "run: 开启新线程去连接蓝牙:");
                             mHandler.sendEmptyMessage(MSG_CONNECT_START);
-                            if (mBluetoothSocket != null && mBluetoothSocket.isConnected()){
-                                Log.e(TAG, "run: 当前设备已连接,正关闭当前设备连接，切换到新设备  当前连接设备:"+mBluetoothSocket.getRemoteDevice().getName());
+                            if (mBluetoothSocket != null && mBluetoothSocket.isConnected()) {
+                                Log.e(TAG, "run: 当前设备已连接,正关闭当前设备连接，切换到新设备  当前连接设备:" + mBluetoothSocket.getRemoteDevice().getName());
                                 mBluetoothSocket.close();
                             }
-
                             mBluetoothSocket = device.createRfcommSocketToServiceRecord(uuid);
                             mAdapter.cancelDiscovery();
                             mBluetoothSocket.connect();
                             mHandler.sendEmptyMessage(mBluetoothSocket.isConnected() ? MSG_CONNECT_SUCCESS : MSG_CONNECT_FAILED);
-                            //printBluetoothInfo();
+                            printBluetoothInfo();
                             //printInfo();
-                        }
-                    } catch (Exception e) {
-                        e.printStackTrace();
-                        if (mBluetoothSocket != null) {
-                            try {
-                                mBluetoothSocket.close();
-                            } catch (IOException ioException) {
-                                ioException.printStackTrace();
+                        } catch (Exception e) {
+                            e.printStackTrace();
+                            if (mBluetoothSocket != null) {
+                                try {
+                                    mBluetoothSocket.close();
+                                } catch (IOException ioException) {
+                                    ioException.printStackTrace();
+                                }
                             }
+                            mBluetoothSocket = null;
+                            mHandler.sendEmptyMessage(MSG_CONNECT_FAILED);
                         }
-                        mHandler.sendEmptyMessage(MSG_CONNECT_FAILED);
                     }
                 }
             }.start();
@@ -421,6 +468,8 @@ public class BluetoothService extends Service {
                         setStyle(out);//打印之前先设置打印机参数，不然会概率性发生默认将最后两行打印到起始位置
                         eYearTest(out);
 
+                        //sendReceiptWithResponse(out);
+
                         Log.e(TAG, "run: 打印结束: 耗时:" + (System.currentTimeMillis() - startTime));
                     } catch (IOException e) {
                         e.printStackTrace();
@@ -429,6 +478,164 @@ public class BluetoothService extends Service {
             }.start();
         } else {
             Toast.makeText(this, "设备未连接", Toast.LENGTH_SHORT).show();
+        }
+    }
+
+    /**
+     * 发送票据
+     */
+    void sendReceiptWithResponse(OutputStream outputStream) {
+        EscCommand esc = new EscCommand();
+        esc.addInitializePrinter();
+        esc.addPrintAndFeedLines((byte) 3);
+        // 设置打印居中
+        esc.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
+        // 设置为倍高倍宽
+        esc.addSelectPrintModes(EscCommand.FONT.FONTA, EscCommand.ENABLE.OFF, EscCommand.ENABLE.ON, EscCommand.ENABLE.ON, EscCommand.ENABLE.OFF);
+        // 打印文字
+        esc.addText("Sample\n");
+        esc.addPrintAndLineFeed();
+
+        /* 打印文字 */
+        // 取消倍高倍宽
+        esc.addSelectPrintModes(EscCommand.FONT.FONTA, EscCommand.ENABLE.OFF, EscCommand.ENABLE.OFF, EscCommand.ENABLE.OFF, EscCommand.ENABLE.OFF);
+        // 设置打印左对齐
+        esc.addSelectJustification(EscCommand.JUSTIFICATION.LEFT);
+        // 打印文字
+        esc.addText("Print text\n");
+        // 打印文字
+        esc.addText("Welcome to use SMARNET printer!\n");
+
+        /* 打印繁体中文 需要打印机支持繁体字库 */
+        String message = "佳博智匯票據打印機\n";
+        //String message = "佳博智能票据打印机\n";
+        esc.addText(message, "GB2312");
+        esc.addPrintAndLineFeed();
+
+        /* 绝对位置 具体详细信息请查看GP58编程手册 */
+        esc.addText("智汇");
+        esc.addSetHorAndVerMotionUnits((byte) 7, (byte) 0);
+        esc.addSetAbsolutePrintPosition((short) 6);
+        esc.addText("网络");
+        esc.addSetAbsolutePrintPosition((short) 10);
+        esc.addText("设备");
+        esc.addPrintAndLineFeed();
+
+        /* 打印图片 */
+        // 打印文字
+        esc.addText("Print bitmap!\n");
+        Bitmap b = BitmapFactory.decodeResource(getResources(), R.drawable.gprinter);
+        // 打印图片
+        esc.addRastBitImage(b, 380, 0);
+
+        /* 打印一维条码 */
+        // 打印文字
+        esc.addText("Print code128\n");
+        esc.addSelectPrintingPositionForHRICharacters(EscCommand.HRI_POSITION.BELOW);
+        // 设置条码可识别字符位置在条码下方
+        // 设置条码高度为60点
+        esc.addSetBarcodeHeight((byte) 60);
+        // 设置条码单元宽度为1
+        esc.addSetBarcodeWidth((byte) 1);
+        // 打印Code128码
+        esc.addCODE128(esc.genCodeB("SMARNET"));
+        esc.addPrintAndLineFeed();
+
+        /*
+         * QRCode命令打印 此命令只在支持QRCode命令打印的机型才能使用。 在不支持二维码指令打印的机型上，则需要发送二维条码图片
+         */
+        // 打印文字
+        esc.addText("Print QRcode\n");
+        // 设置纠错等级
+        esc.addSelectErrorCorrectionLevelForQRCode((byte) 0x31);
+        // 设置qrcode模块大小
+        esc.addSelectSizeOfModuleForQRCode((byte) 3);
+        // 设置qrcode内容
+        esc.addStoreQRCodeData("www.smarnet.cc");
+        esc.addPrintQRCode();// 打印QRCode
+        esc.addPrintAndLineFeed();
+
+        // 设置打印左对齐
+        esc.addSelectJustification(EscCommand.JUSTIFICATION.CENTER);
+        //打印文字
+        esc.addText("Completed!\r\n");
+
+        // 开钱箱
+        esc.addGeneratePlus(LabelCommand.FOOT.F5, (byte) 255, (byte) 255);
+        esc.addPrintAndFeedLines((byte) 8);
+        // 加入查询打印机状态，用于连续打印
+        byte[] bytes = {29, 114, 1};
+        esc.addUserCommand(bytes);
+        Vector<Byte> datas = esc.getCommand();
+        // 发送数据
+        //DeviceConnFactoryManager.getDeviceConnFactoryManagers()[id].sendDataImmediately(datas);
+
+        try {
+            outputStream.write(convertVectorByteToBytes(datas));
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+
+    }
+
+    private void connectedState() {
+        int flag = -1;
+
+        int a2dp = mAdapter.getProfileConnectionState(BluetoothProfile.A2DP);
+        int headset = mAdapter.getProfileConnectionState(BluetoothProfile.HEADSET);
+        int health = mAdapter.getProfileConnectionState(BluetoothProfile.HEALTH);
+        int health1 = mAdapter.getProfileConnectionState(BluetoothProfile.GATT);
+        int health2 = mAdapter.getProfileConnectionState(BluetoothProfile.GATT_SERVER);
+        int health3 = mAdapter.getProfileConnectionState(BluetoothProfile.HEADSET);
+        int health4 = mAdapter.getProfileConnectionState(BluetoothProfile.HEARING_AID);
+        int health5 = mAdapter.getProfileConnectionState(BluetoothProfile.HID_DEVICE);
+        int health6 = mAdapter.getProfileConnectionState(BluetoothProfile.SAP);
+
+        Log.e(TAG, "connectedState: a2dp:" + a2dp + " headset:");
+        if (a2dp == BluetoothProfile.STATE_CONNECTED) {
+            flag = a2dp;
+        } else if (headset == BluetoothProfile.STATE_CONNECTED) {
+            flag = headset;
+        } else if (health == BluetoothProfile.STATE_CONNECTED) {
+            flag = health;
+        } else if (health1 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health1;
+        } else if (health2 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health2;
+        } else if (health3 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health3;
+        } else if (health4 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health4;
+        } else if (health5 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health5;
+        } else if (health6 == BluetoothProfile.STATE_CONNECTED) {
+            flag = health6;
+        }
+        Log.e(TAG, "flag is " + flag);
+
+        //if (flag != -1) {
+        if (true) {
+            mAdapter.getProfileProxy(this, new BluetoothProfile.ServiceListener() {
+
+                @Override
+                public void onServiceDisconnected(int profile) {
+                    Log.e(TAG, "onServiceDisconnected:" + profile);
+
+                }
+
+                @Override
+                public void onServiceConnected(int profile, BluetoothProfile proxy) {
+                    Log.e(TAG, "onServiceConnected: " + profile);
+                    List<BluetoothDevice> mDevices = proxy.getConnectedDevices();
+                    if (mDevices != null && mDevices.size() > 0) {
+                        for (BluetoothDevice device : mDevices) {
+                            Log.e(TAG, "device name: " + device.getName());
+                        }
+                    } else {
+                        Log.e(TAG, "mDevices is null");
+                    }
+                }
+            }, flag);
         }
     }
 
@@ -567,9 +774,13 @@ public class BluetoothService extends Service {
                 case MSG_CONNECT_SUCCESS:
                     service.mBtStateReceiver.sendStateCode(IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_SUCCESS);
                     service.sendCurBondedDevs();
+                    service.connectedState();
+                    service.setFlowViewContent(true);
                     break;
                 case MSG_CONNECT_FAILED:
                     service.mBtStateReceiver.sendStateCode(IBluetoothStateCallBack.BT_CODE_DEV_CONNECT_FAILED);
+                    service.sendCurBondedDevs();
+                    service.setFlowViewContent(false);
                     break;
             }
         }

@@ -23,11 +23,12 @@ public interface IBluetoothStateCallBack {
     int BT_CODE_LOC_GRANT_FAILED = 3;    //蓝牙定位 授权失败
     int BT_CODE_ENABLE_SUCCESS = 4;      //请求打开蓝牙 授权成功
     int BT_CODE_ENABLE_FAILED = 5;       //请求打开蓝牙 授权失败
-    int BT_CODE_BONDED = 6;              //绑定 设备完成
-    int BT_CODE_UN_BONDED = 7;           //解绑 设备完成
-    int BT_CODE_DEV_CONNECT_START = 8;   //连接 --> 开始
-    int BT_CODE_DEV_CONNECT_SUCCESS = 9; //连接 --> 成功
-    int BT_CODE_DEV_CONNECT_FAILED = 10; //连接 --> 失败
+    int BT_CODE_BONDED_SUCCESS = 6;      //绑定设备成功
+    int BT_CODE_BONDED_FAILED = 7;       //绑定设备失败
+    int BT_CODE_UN_BONDED = 8;           //解绑设备完成
+    int BT_CODE_DEV_CONNECT_START = 9;   //连接 --> 开始
+    int BT_CODE_DEV_CONNECT_SUCCESS = 10;//连接 --> 成功
+    int BT_CODE_DEV_CONNECT_FAILED = 11; //连接 --> 失败
 
     @IntDef({BT_CODE_DISCOVERY_START,
             BT_CODE_DISCOVERY_FINISHED,
@@ -35,7 +36,8 @@ public interface IBluetoothStateCallBack {
             BT_CODE_LOC_GRANT_FAILED,
             BT_CODE_ENABLE_SUCCESS,
             BT_CODE_ENABLE_FAILED,
-            BT_CODE_BONDED,
+            BT_CODE_BONDED_SUCCESS,
+            BT_CODE_BONDED_FAILED,
             BT_CODE_UN_BONDED,
             BT_CODE_DEV_CONNECT_START,
             BT_CODE_DEV_CONNECT_SUCCESS,

@@ -305,6 +305,25 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
         }
     }
 
+    private void showLinkFailedDialog() {
+        FxDialog dialog = new FxDialog(this);
+        dialog.setTitle("连接失败")
+                .setContent("请确保当前设备正常可用,且为移动打印机设备\n(可能原因:不在范围内、电量不足...)")
+                .setNegativeVisibility(false)
+                .setPositive("确定")
+                .setOnClickBottomListener(new FxDialog.OnClickBottomListener() {
+                    @Override
+                    public void onPositiveClick() {
+                        dialog.dismiss();
+                    }
+
+                    @Override
+                    public void onNegativeClick() {
+
+                    }
+                }).show();
+    }
+
     private class BtStateCallBack implements IBluetoothStateCallBack {
 
         @Override
@@ -350,7 +369,8 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
                     break;
                 case IBluetoothStateCallBack.BT_CODE_ENABLE_FAILED:
                     break;
-                case IBluetoothStateCallBack.BT_CODE_BONDED:
+                case IBluetoothStateCallBack.BT_CODE_BONDED_SUCCESS:
+                case IBluetoothStateCallBack.BT_CODE_BONDED_FAILED:
                     mIsBonding = false;
                     break;
                 case IBluetoothStateCallBack.BT_CODE_UN_BONDED:
@@ -370,6 +390,7 @@ public class BluetoothSetActivity extends BluetoothPmActivity implements View.On
                     mIsConnecting = false;
                     mTvProConnectState.setText("设备连失败");
                     mRlLoadView.setVisibility(View.GONE);
+                    showLinkFailedDialog();
                     break;
             }
         }

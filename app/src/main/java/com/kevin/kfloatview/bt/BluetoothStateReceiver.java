@@ -102,9 +102,11 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
                 //Todo 蓝牙adapter
                 case BluetoothAdapter.ACTION_SCAN_MODE_CHANGED:
                 case BluetoothAdapter.ACTION_STATE_CHANGED:
+                    aBlueEnableStateChanged(intent);
+                    break;
                 case BluetoothAdapter.ACTION_LOCAL_NAME_CHANGED:
                     break; //上面为暂未处理action
-                case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED:
+                case BluetoothAdapter.ACTION_CONNECTION_STATE_CHANGED://Todo 注:这里测试发现，连接状态变化并没有收到改广播
                     aConnectionStateChanged(intent);
                     break;
                 case BluetoothAdapter.ACTION_DISCOVERY_FINISHED:
@@ -117,6 +119,7 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
                     mCacheFindDevs.clear();
                     mMapCacheFindDevs.clear();
                     sendStateCode(IBluetoothStateCallBack.BT_CODE_DISCOVERY_START);
+                    mBtService.sendCurBondedDevs();
                     break;
                 case BluetoothAdapter.ACTION_REQUEST_DISCOVERABLE:
                     Log.e(TAG, "onReceive: 请求自身蓝牙可被发现");
@@ -140,6 +143,32 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
                     break;
             }
         }
+    }
+
+    private void aBlueEnableStateChanged(Intent intent) {
+        int curState = intent.getIntExtra(BluetoothAdapter.EXTRA_STATE, -1);
+        int previousState = intent.getIntExtra(BluetoothAdapter.EXTRA_PREVIOUS_STATE, -1);
+
+        if (DEBUG) {
+            Log.e(TAG, "aBlueEnableStateChanged: 之前蓝牙状态:" + previousState);
+            Log.e(TAG, "aBlueEnableStateChanged: 现在蓝牙状态:" + curState);
+            Log.e(TAG, "aBlueEnableStateChanged: ----------------");
+        }
+
+        if (previousState == BluetoothAdapter.STATE_TURNING_OFF && curState == BluetoothAdapter.STATE_OFF) {
+            Log.e(TAG, "aBlueEnableStateChanged: 蓝牙已经关闭");
+            mCacheFindDevs.clear();
+            mMapCacheFindDevs.clear();
+            mBtService.releaseCurConnect();
+            mCallBack.updateBondedDevs(new ArrayList<>());
+            mCallBack.updateScanDevs(mCacheFindDevs);
+        } else if (previousState == BluetoothAdapter.STATE_TURNING_ON && curState == BluetoothAdapter.STATE_ON) {
+            Log.e(TAG, "aBlueEnableStateChanged: 蓝牙已经打开");
+            //蓝牙打开的事件不处理
+            //BluetoothPmActivity.BT_ACTION_ENABLE_BLUETOOTH_STATE这里已经处理了
+        }
+
+
     }
 
     private void aConnectionStateChanged(Intent intent) {
@@ -180,10 +209,16 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
         if (previousState == BluetoothDevice.BOND_BONDING && curState == BluetoothDevice.BOND_BONDED) {
             if (mMapCacheFindDevs.remove(device.getName()) != null) //将已绑定的设备从发现的设备集合中移除
                 sendFindDevsInHashMap();
-            sendStateCode(IBluetoothStateCallBack.BT_CODE_BONDED);
+            sendStateCode(IBluetoothStateCallBack.BT_CODE_BONDED_SUCCESS);
             mBtService.sendCurBondedDevs();
+            mBtService.connect(device);
             Log.e(TAG, "aBondStateChanged: 有设备绑定成功+++++");
+        } else if (previousState == BluetoothDevice.BOND_BONDING && curState == BluetoothDevice.BOND_NONE) {
+            Log.e(TAG, "aBondStateChanged: 有设备绑定失败+++++");
+            sendStateCode(IBluetoothStateCallBack.BT_CODE_BONDED_FAILED);
         } else if (previousState == BluetoothDevice.BOND_BONDED && curState == BluetoothDevice.BOND_NONE) {
+            if (mBtService.isConnected(device))
+                mBtService.releaseCurConnect();
             sendStateCode(IBluetoothStateCallBack.BT_CODE_UN_BONDED);
             mBtService.sendCurBondedDevs();
             Log.e(TAG, "aBondStateChanged: 有设备解绑成功-----");
@@ -244,16 +279,22 @@ public class BluetoothStateReceiver extends BroadcastReceiver {
             if (findName != null) {
                 int proSize = mMapCacheFindDevs.size();
                 Set<BluetoothDevice> set = mBtService.getBondedDevs();
-                if (set != null) {
+                if (set == null || set.size() == 0) {
+                    mMapCacheFindDevs.put(findName, new BtSettingDeviceInfo(device, false));
+                } else {
+                    boolean findIsInBonded = false;//发现的设备是否在已经绑定的设备集合中
                     for (BluetoothDevice bondedDev : set) {
-                        if (!Objects.equals(bondedDev.getName(), findName)) //只将不在已经绑定的集合中的新设备添加到发现的设备集合中
-                            mMapCacheFindDevs.put(findName, new BtSettingDeviceInfo(device, false));//通过HashMap去重
+                        if (Objects.equals(bondedDev.getName(), findName)) {
+                            findIsInBonded = true;
+                            break;
+                        }
                     }
+                    if (!findIsInBonded) //发现的设备不在已经绑定的设备集合中，则添加到发现设备集合中
+                        mMapCacheFindDevs.put(findName, new BtSettingDeviceInfo(device, false));
                 }
                 int afterSize = mMapCacheFindDevs.size();
                 if (afterSize - proSize >= 1)//说明有新的设备发现
                     sendFindDevsInHashMap();
-                filterBondedDevsInFindMap();
                 if (mMapCacheFindDevs.size() >= DEFAULT_SCAN_DEV_NUMBER)
                     mBtService.scanBluetooth(false);
             }
